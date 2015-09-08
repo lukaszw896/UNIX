@@ -1,2 +1,5 @@
 client
 server
+*.dat
+CMakeLists.txt
+.idea/

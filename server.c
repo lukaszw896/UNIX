@@ -191,6 +191,8 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
     int isThisClientDisconnected;
 
+    int isMemoryCleanedUp;
+
     /* Control variable for connection lost. */
     int dead = 0;
     /* To discriminate player, which starts the game */
@@ -230,6 +232,8 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                 }
                 i=i+1;
             }
+            //assigning memory
+            isMemoryCleanedUp = 1;
             fd =fopen(fileName, "a");
             snprintf(gameData,50,"First player IP: %d and Socket:%d", (int)clientAddress.sin_addr.s_addr,(int)clientAddress.sin_port);
             fwrite(gameData, sizeof(char), 50, fd);
@@ -471,7 +475,11 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                     if(playerType == FIRST){
                         fclose(fd);   
                     }
-                    cleanUp(msg,msg2,scrabbleGameAddress,&scrabbleGameId,&gameSemId);
+                    if(isMemoryCleanedUp) {
+                        cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, &gameSemId);
+                        isMemoryCleanedUp = 0;
+                    }
+                    printf("Everything has been clean up");
                 } else if (msg->msg == FINISH_GAME) {
                     printf("Finish the game!!!\n");
                     /***test***/
@@ -482,7 +490,10 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                         fclose(fd);
                         
                     }
-                    cleanUp(msg,msg2,scrabbleGameAddress,&scrabbleGameId,&gameSemId);  
+                    if(isMemoryCleanedUp) {
+                        cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, &gameSemId);
+                        isMemoryCleanedUp = 0;
+                    }
                 } else
                     printf("[Client %d] Error in packet sent from client.", clientDescriptor);
 
@@ -501,7 +512,10 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
         printf("[CLIENT %d]CLEANUP\n", clientDescriptor);
         msg->msg = EXIT;
        // tcp_socket_send_packet(clientDescriptor, msg);
-        cleanUp(msg,msg2,scrabbleGameAddress,&scrabbleGameId,&gameSemId);
+        if(isMemoryCleanedUp) {
+            cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, &gameSemId);
+            isMemoryCleanedUp = 0;
+        }
     }
 
 }
