@@ -85,7 +85,8 @@ int main(void) {
     packet* rec = malloc(sizeof (packet));
     packet* tmp = malloc(sizeof (packet));
     char c;
-    int x, y, points;
+    int x, y, points,i;
+    int isAnyTileAvaliable;
     semaphore_init(&sem, 'E', 1);
     
     /* Set signals handlers */
@@ -141,6 +142,12 @@ int main(void) {
                 printf("----------------------------------------\n              ");
                 scrabble_game_print_available_tiles(rec->tiles, 5);
                 printf("----------------------------------------\n");
+                isAnyTileAvaliable = 0;
+                for(i=0; i<5;i++){
+                    if(rec->tiles[i] != 'x'){
+                        isAnyTileAvaliable = 1;
+                    }
+                }
 
                 points = 0;
                 gather_input(&c, &x, &y, &points, rec->tiles, rec->currentBoard);

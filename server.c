@@ -26,7 +26,8 @@
 #include <fcntl.h>
 
 #define BACKLOG 3
-#define GAME_DATA_ENTRY 1000
+#define GAME_DATA_ENTRY 3000
+#define LOG_FILE_NAME "LogFile.dat"
 /*
  * When SIGINT is catched, this variable will tell main loop to stop.
  */
@@ -43,15 +44,15 @@ typedef struct
 	int status;
 	int shmId;
 	int semId;
-        FILE* fd;
-        char fileName[GAME_DATA_ENTRY];
+    FILE* fd;
+    char fileName[GAME_DATA_ENTRY];
 } PlayerInfo;
 
 /*
  * Each client after accepting, gets his own process and permorms this function.
  */
 void handle_client(int, int, PlayerInfo*,struct sockaddr_in);
-void cleanUp(packet*,packet*,game*,int*,int*);
+void cleanUp(packet*,packet*,game*,int*,int);
 void clearGameDataString(char*);
 
 int64_t bulk_write(FILE* fd, char *buf, size_t count){
@@ -225,14 +226,9 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             time_t t = time(NULL);
             struct tm tm = *localtime(&t);
 
-            snprintf(fileName,GAME_DATA_ENTRY,"%d%d%d%d%d%d.dat\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-            while(1){
-                if(fileName[i]=='t'){
-                fileName[i+1]='\0';
-                break;
-                }
-                i=i+1;
-            }
+            snprintf(fileName,GAME_DATA_ENTRY,"%d%d%d%d%d%d.dat\n\0", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+
             //assigning memory
             isMemoryCleanedUp = 1;
             //writing ip and socket info to a file by first player in the game
@@ -441,9 +437,18 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                 //  tcp_socket_read_packet(clientDescriptor, msg);
                 if (msg->msg == MOVE_DATA) {
                     printf("[Client %d] New letter: %c\n", clientDescriptor, msg->letter);
+                    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] New letter: %c\n", gameData, clientDescriptor, msg->letter);
+                    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
+
                     printf("[Client %d] Coordinates: (%d,%d)\n", clientDescriptor, msg->x_coord, msg->y_coord);
+                    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] Coordinates: (%d,%d)\n", gameData,clientDescriptor, msg->x_coord, msg->y_coord);
+                    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
+
                     printf("[Client %d] Tiles_returned: %c %c %c %c %c\n", clientDescriptor, msg->tiles[0],
                             msg->tiles[1], msg->tiles[2], msg->tiles[3], msg->tiles[4]);
+                    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] Tiles_returned: %c %c %c %c %c\n", gameData, clientDescriptor, msg->tiles[0],
+                             msg->tiles[1], msg->tiles[2], msg->tiles[3], msg->tiles[4]);
+                    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
 
                     /* Update shared memory */
                     scrabbleGameAddress->gameBoard[msg->x_coord][msg->y_coord] = msg->letter;
@@ -484,7 +489,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                     printf("Cleaning up memory by client server:[%d] in Play another game \n",clientDescriptor);
                     if(isMemoryCleanedUp) {
 
-                        cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, &gameSemId);
+                        cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
                         isMemoryCleanedUp = 0;
                     }
                 } else if (msg->msg == FINISH_GAME) {
@@ -500,7 +505,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                     printf("Cleaning up memory by client server:[%d] in Finish the game \n",clientDescriptor);
                     if(isMemoryCleanedUp) {
 
-                        cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, &gameSemId);
+                        cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
                         isMemoryCleanedUp = 0;
                     }
                 } else
@@ -525,7 +530,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
         printf("Cleaning up memory by client server:[%d] in server process closing \n",clientDescriptor);
         if(isMemoryCleanedUp) {
 
-            cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, &gameSemId);
+            cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
             isMemoryCleanedUp = 0;
         }
     }
@@ -538,12 +543,12 @@ void clearGameDataString(char* gameDataEntry){
     }
 }
 
-void cleanUp(packet* msg,packet* msg2,game* scrabbleGameAddress,int*scrabbleGameId,int* gameSemId){
+void cleanUp(packet* msg,packet* msg2,game* scrabbleGameAddress,int*scrabbleGameId,int gameSemId){
         free(msg);
         free(msg2);
         shared_mem_detach((char*) scrabbleGameAddress);
         shared_mem_delete(*scrabbleGameId);
-        semaphore_remove(*gameSemId);
+        semaphore_remove(gameSemId);
 }
 
 void sigint_handler(int sig) {

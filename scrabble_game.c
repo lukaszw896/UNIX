@@ -73,19 +73,27 @@ char scrabble_game_get_random_tile(char tiles[25])
 {
 	srand(time(NULL));
 	char c;
-	int r;
-	
-	while(1)
-	{
-		r = rand() % 25;
-		if(tiles[r] == UNAVAILABLE)
-			continue;
-		else
-		{
-			c = tiles[r];
-			tiles[r] = UNAVAILABLE;
-			return c;
+	int r,i,isAnyTileAvaliable;
+	isAnyTileAvaliable = 0;
+	for( i=0;i<25;i++){
+		if(tiles[i] != UNAVAILABLE){
+			isAnyTileAvaliable = 1;
 		}
+	}
+	if(isAnyTileAvaliable == 1) {
+		while (1) {
+			r = rand() % 25;
+			if (tiles[r] == UNAVAILABLE)
+				continue;
+			else {
+				c = tiles[r];
+				tiles[r] = UNAVAILABLE;
+				return c;
+			}
+		}
+	}
+	else{
+		return 'x';
 	}
 }
 

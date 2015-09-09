@@ -21,7 +21,12 @@ void semaphore_init(int* semId, char semName, int n)
 
 void semaphore_remove(int semId)
 {
-	semctl(semId, 0, IPC_RMID);
+	//semctl(semId, 0, IPC_RMID);
+	if(semctl(semId, 0, IPC_RMID) == -1)
+	{
+		perror("Sem_op error\n");
+		exit(1);
+	}
 }
 
 void semaphore_lock(int semId, short semIndex ,short flag)
