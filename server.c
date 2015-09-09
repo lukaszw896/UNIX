@@ -142,9 +142,9 @@ int main(void)
 				printf("Client with pid: %d disconnected.\n", getpid());
 				printf("Waiting for a clients'...\n");
 				return EXIT_SUCCESS;
-                                for(;;){
+                                /*for(;;){
                                     sleep(1);
-                                }
+                                }*/
 			default:
 				if(pid < 0)
 				{
@@ -234,6 +234,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             }
             //assigning memory
             isMemoryCleanedUp = 1;
+            //writing ip and socket info to a file by first player in the game
             fd =fopen(fileName, "a");
             snprintf(gameData,50,"First player IP: %d and Socket:%d", (int)clientAddress.sin_addr.s_addr,(int)clientAddress.sin_port);
             fwrite(gameData, sizeof(char), 50, fd);
@@ -347,7 +348,13 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             /* Inform game that second player has connected. */
             semaphore_lock(gameSemId, 0, 0);
             scrabbleGameAddress->status = CONNECTED;
-            
+
+            //writing ip and socket info to a file by second player
+            fd =fopen(fileName, "a");
+            snprintf(gameData,50,"Second player IP: %d and Socket:%d", (int)clientAddress.sin_addr.s_addr,(int)clientAddress.sin_port);
+            fwrite(gameData, sizeof(char), 50, fd);
+            clearGameDataString(gameData);
+            fclose(fd);
             
             /* Since this player moves second, send empty game board and tiles*/
             msg->msg = INFO;
@@ -424,6 +431,9 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             if ((t = tcp_socket_read_packet(clientDescriptor, msg)) <= 0) {
                 printf("Client %d Disconnected\n", clientDescriptor);
                 scrabbleGameAddress->didClientDisconnect = 1;
+
+                isMemoryCleanedUp=0;
+
                 if (playerType == SECOND) {
                     semaphore_unlock(gameSemId, 1, 0);
                 } else {
@@ -433,7 +443,8 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                 isThisClientDisconnected = 1;
                 g_doWork = 0;
                 if(playerType == FIRST){
-                        fclose(fd);
+                       //
+                       // fclose(fd);
                         
                     }
                 //exit(1);
@@ -469,17 +480,20 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                 } else if (msg->msg == PLAY_ANOTHER_GAME) {
                     printf("play another game!!!\n");
                     /***test***/
-                scrabbleGameAddress->didClientDisconnect=0;
+                    scrabbleGameAddress->didClientDisconnect=0;
                     dead = 1;
                     g_doWork = 1;
                     if(playerType == FIRST){
-                        fclose(fd);   
+                        printf("Closing descriptor!!!\n");
+                       // fclose(fd);
+                        printf("decriptor has been closed!!!\n");
                     }
+                    printf("Cleaning up memory by client server:[%d] in Play another game \n",clientDescriptor);
                     if(isMemoryCleanedUp) {
+
                         cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, &gameSemId);
                         isMemoryCleanedUp = 0;
                     }
-                    printf("Everything has been clean up");
                 } else if (msg->msg == FINISH_GAME) {
                     printf("Finish the game!!!\n");
                     /***test***/
@@ -487,10 +501,12 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                     g_doWork = 0;
                     dead = 1;
                     if(playerType == FIRST){
-                        fclose(fd);
+                       // fclose(fd);
                         
                     }
+                    printf("Cleaning up memory by client server:[%d] in Finish the game \n",clientDescriptor);
                     if(isMemoryCleanedUp) {
+
                         cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, &gameSemId);
                         isMemoryCleanedUp = 0;
                     }
@@ -509,10 +525,13 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
     if (isThisClientDisconnected == 0 && !dead) {
         /* Clean up */
+
         printf("[CLIENT %d]CLEANUP\n", clientDescriptor);
         msg->msg = EXIT;
        // tcp_socket_send_packet(clientDescriptor, msg);
+        printf("Cleaning up memory by client server:[%d] in server process closing \n",clientDescriptor);
         if(isMemoryCleanedUp) {
+
             cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, &gameSemId);
             isMemoryCleanedUp = 0;
         }
