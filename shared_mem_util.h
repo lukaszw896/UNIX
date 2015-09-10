@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <errno.h>
 
 /*
  * Basically wraps shmget() to provide error check.

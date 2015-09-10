@@ -14,7 +14,7 @@ typedef struct
 	int p1Points;
 	int p2Points;
 	int didClientDisconnect;
-	
+	int didGameEnd;
 } game;
 
 void scrabble_game_init(int*, game*);

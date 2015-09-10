@@ -247,6 +247,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             scrabbleGameAddress->p1Points = 0;
             scrabbleGameAddress->p2Points = 0;
             scrabbleGameAddress->didClientDisconnect = 0;
+            scrabbleGameAddress->didGameEnd = 0;
             scrabble_game_blank(scrabbleGameAddress);
             printf("Game has been initialized.\n");
             scrabble_game_print_available_tiles(scrabbleGameAddress->avTiles, 25);
@@ -259,6 +260,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
             /* Inform client about changes */
             msg->msg = NO_PLAYER;
+            msg->isMatchOngoing = 1;
             tcp_socket_send_packet(clientDescriptor, msg);
 
             /* Save info for future player */
@@ -455,6 +457,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                     scrabbleGameAddress->p1Points = msg->p1Points;
                     scrabbleGameAddress->p2Points = msg->p2Points;
 
+
                     /* Delete used tile */
                     for (u = 0; u < 5; u++)
                         if (playerTiles[u] == msg->letter) {
@@ -475,38 +478,76 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                     } else {
                         semaphore_unlock(gameSemId, 2, 0);
                     }
-                } else if (msg->msg == PLAY_ANOTHER_GAME) {
-                    printf("play another game!!!\n");
-                    /***test***/
-                    scrabbleGameAddress->didClientDisconnect=0;
-                    dead = 1;
-                    g_doWork = 1;
-                    if(playerType == FIRST){
-                        printf("Closing descriptor!!!\n");
-                       // fclose(fd);
-                        printf("decriptor has been closed!!!\n");
-                    }
-                    printf("Cleaning up memory by client server:[%d] in Play another game \n",clientDescriptor);
-                    if(isMemoryCleanedUp) {
 
-                        cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
-                        isMemoryCleanedUp = 0;
+                } else if (msg->msg == PLAY_ANOTHER_GAME) {
+                    if(msg->isMatchOngoing == 0){
+                        scrabbleGameAddress->didClientDisconnect = 0;
+                        dead = 1;
+                        g_doWork = 1;
+                        if (playerType == SECOND) {
+                            semaphore_unlock(gameSemId, 1, 0);
+                        }
+                        else {
+                            printf("Cleaning up memory by client server:[%d] in Play another game \n",
+                                   clientDescriptor);
+                            if (isMemoryCleanedUp) {
+
+                                cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
+                                isMemoryCleanedUp = 0;
+                            }
+                        }
                     }
+                    else {
+                        printf("play another game!!!\n");
+                        /***test***/
+                        scrabbleGameAddress->didClientDisconnect = 0;
+                        dead = 1;
+                        g_doWork = 1;
+
+                        printf("Cleaning up memory by client server:[%d] in Play another game \n",
+                                   clientDescriptor);
+                        if (isMemoryCleanedUp) {
+
+                            cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
+                            isMemoryCleanedUp = 0;
+                        }
+
+                    }
+
                 } else if (msg->msg == FINISH_GAME) {
                     printf("Finish the game!!!\n");
-                    /***test***/
-                scrabbleGameAddress->didClientDisconnect=0;
-                    g_doWork = 0;
-                    dead = 1;
-                    if(playerType == FIRST){
-                       // fclose(fd);
-                        
-                    }
-                    printf("Cleaning up memory by client server:[%d] in Finish the game \n",clientDescriptor);
-                    if(isMemoryCleanedUp) {
+                    if(msg->isMatchOngoing == 0){
+                        scrabbleGameAddress->didClientDisconnect = 0;
+                        dead = 1;
+                        g_doWork = 0;
+                        if (playerType == SECOND) {
+                            semaphore_unlock(gameSemId, 1, 0);
+                        }
+                        else {
+                            printf("Cleaning up memory by client server:[%d] in Play another game \n",
+                                   clientDescriptor);
+                            if (isMemoryCleanedUp) {
 
-                        cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
-                        isMemoryCleanedUp = 0;
+                                cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
+                                isMemoryCleanedUp = 0;
+                            }
+                        }
+                    }
+                    else {
+                        printf("play another game!!!\n");
+                        /***test***/
+                        scrabbleGameAddress->didClientDisconnect = 0;
+                        dead = 1;
+                        g_doWork = 0;
+
+                        printf("Cleaning up memory by client server:[%d] in Play another game \n",
+                               clientDescriptor);
+                        if (isMemoryCleanedUp) {
+
+                            cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
+                            isMemoryCleanedUp = 0;
+                        }
+
                     }
                 } else
                     printf("[Client %d] Error in packet sent from client.", clientDescriptor);

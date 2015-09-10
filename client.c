@@ -148,30 +148,51 @@ int main(void) {
                         isAnyTileAvaliable = 1;
                     }
                 }
+                if(isAnyTileAvaliable == 1) {
+                    points = 0;
+                    gather_input(&c, &x, &y, &points, rec->tiles, rec->currentBoard);
+                    tmp->isMatchOngoing = 1;
+                    /* Print updated points */
+                    scrabble_game_print_title();
+                    if (rec->playerType == FIRST) rec->p1Points += points;
+                    if (rec->playerType == SECOND) rec->p2Points += points;
+                    scrabble_game_print_points(rec->p1Points, rec->p2Points, rec->playerType);
 
-                points = 0;
-                gather_input(&c, &x, &y, &points, rec->tiles, rec->currentBoard);
+                    /* Print updated board */
+                    rec->currentBoard[x][y] = c;
+                    scrabble_game_print_board(rec->currentBoard);
 
-                /* Print updated points */
-                scrabble_game_print_title();
-                if (rec->playerType == FIRST) rec->p1Points += points;
-                if (rec->playerType == SECOND) rec->p2Points += points;
-                scrabble_game_print_points(rec->p1Points, rec->p2Points, rec->playerType);
+                    /* Send data to server. */
+                    tmp->msg = MOVE_DATA;
+                    tmp->letter = c;
+                    tmp->x_coord = x;
+                    tmp->y_coord = y;
+                    tmp->p1Points = rec->p1Points;
+                    tmp->p2Points = rec->p2Points;
 
-                /* Print updated board */
-                rec->currentBoard[x][y] = c;
-                scrabble_game_print_board(rec->currentBoard);
-
-                /* Send data to server. */
-                tmp->msg = MOVE_DATA;
-                tmp->letter = c;
-                tmp->x_coord = x;
-                tmp->y_coord = y;
-                tmp->p1Points = rec->p1Points;
-                tmp->p2Points = rec->p2Points;
-
-                tcp_socket_send_packet(s, tmp);
-                scrabble_game_print_wait_for_move();
+                    tcp_socket_send_packet(s, tmp);
+                    scrabble_game_print_wait_for_move();
+                }
+                else{
+                    printf("########################################\n");
+                    printf("#             END OF MATCH             #\n");
+                    printf("########################################\n");
+                    printf("Do you want to play another game?(Y/N)\n");
+                    scanf(" %c", decission);
+                    printf("%s \n",decission);
+                    if (decission[0] == 'Y') {
+                        tmp->msg = PLAY_ANOTHER_GAME;
+                        tmp->isMatchOngoing = 0;
+                        tcp_socket_send_packet(s, tmp);
+                    }
+                    else
+                    {
+                        tmp->msg = FINISH_GAME;
+                        tcp_socket_send_packet(s, tmp);
+                        return EXIT_SUCCESS;
+                        break;
+                    }
+                }
                 break;
             case DISCONNECTED:
 

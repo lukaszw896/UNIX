@@ -1,4 +1,9 @@
+#include <netdb.h>
 #include "semaphore_util.h"
+
+#define ERR(source) (fprintf(stderr,"%s:%d\n",__FILE__,__LINE__),\
+                     perror(source),kill(0,SIGKILL),\
+		     		     exit(EXIT_FAILURE))
 
 void semaphore_init(int* semId, char semName, int n)
 {
@@ -10,8 +15,11 @@ void semaphore_init(int* semId, char semName, int n)
 	tmp.val = 1;
 	
 	/* Create semaphore */
-	*semId = semget(key, n, 0666 | IPC_CREAT);
-	
+	if((*semId = semget(key, n, 0666 | IPC_CREAT))==-1){
+		ERR("semget");
+		exit(1);
+	}
+
 	/* Set value of each semaphore in the set to 1 */
 	for(i = 0; i < n; i++)
 	{

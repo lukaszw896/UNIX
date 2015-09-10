@@ -1,10 +1,18 @@
 #ifndef SEMAPHORE_UTIL_H
 #define SEMPAHORE_UTIL_H
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
+#include <errno.h>
+
+#include <sys/types.h>
+#include <signal.h>
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
 
 /*
  * Union needed for semctl() function calls.

@@ -6,7 +6,7 @@ void shared_mem_init(int* shmId, int size, char shmName)
 	
 	key = ftok("./", shmName);
 	//printf("%s\n",key);
-	if((*shmId=shmget(key, size, IPC_CREAT | 666)) == -1 )
+	if((*shmId=shmget(IPC_PRIVATE, size, IPC_CREAT | 0777)) == -1 )
 	{
 		printf("semget error!init\n");
 		exit(1);
@@ -18,6 +18,7 @@ char* shared_mem_attach(int shmId)
 	char* pShm = NULL;
 	if((pShm=shmat(shmId, NULL,0))==(char *)-1)
 	{
+		perror("attach");
 		printf("shmat error!attach\n");
 		exit(1);
 	}
