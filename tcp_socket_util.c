@@ -59,7 +59,8 @@ void tcp_socket_listen(int* descriptor, int incomingConn)
 
 void tcp_socket_send_packet(int socket, packet* pac)
 {
-	char serialized[200]; 
+	char serialized[200];
+	//printf("In send packet: %d \n",pac->isMatchOngoing);
 	tcp_socket_serialize(*pac, serialized);
 
 	if(send(socket, serialized, sizeof(serialized),0) == -1)
@@ -82,15 +83,20 @@ int tcp_socket_read_packet(int socket, packet* pac)
 			perror("recv");
             return t;
         }
-        
+
         tcp_socket_deserialize(pac, serialized);
+	printf("Right after deserialization: %d\n",pac->isMatchOngoing);
         return t;
 }
+
+
+///// HTON
 // HARDCODED FOR NOW
 void tcp_socket_serialize(packet pac, char* str)
 {
+	//printf("Right before serilizing = %d\n",pac.isMatchOngoing);
 	sprintf(str, 
-	"%d%c%c%c%d%c%d%c%d%c%d%c%d%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c", 
+	"%d%c%c%c%d%c%d%c%d%c%d%c%d%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%d",
 	
 	pac.msg, SEPARATOR, pac.letter, SEPARATOR, pac.x_coord, SEPARATOR, pac.y_coord, 
 	SEPARATOR, pac.p1Points, SEPARATOR, pac.p2Points, SEPARATOR, pac.playerType,
@@ -101,15 +107,17 @@ void tcp_socket_serialize(packet pac, char* str)
 	SEPARATOR, pac.currentBoard[3][0], SEPARATOR, pac.currentBoard[3][1], SEPARATOR, pac.currentBoard[3][2], SEPARATOR, pac.currentBoard[3][3], SEPARATOR, pac.currentBoard[3][4], 
 	SEPARATOR, pac.currentBoard[4][0], SEPARATOR, pac.currentBoard[4][1], SEPARATOR, pac.currentBoard[4][2], SEPARATOR, pac.currentBoard[4][3], SEPARATOR, pac.currentBoard[4][4],
 	
-	SEPARATOR, pac.tiles[0], SEPARATOR, pac.tiles[1], SEPARATOR, pac.tiles[2], SEPARATOR, pac.tiles[3], SEPARATOR, pac.tiles[4]	
+	SEPARATOR, pac.tiles[0], SEPARATOR, pac.tiles[1], SEPARATOR, pac.tiles[2], SEPARATOR, pac.tiles[3], SEPARATOR, pac.tiles[4]	,SEPARATOR, pac.isMatchOngoing
 
 	);
+	//printf("Serialize:%s\n",str);
 } 
 // HARDCODED FOR NOW
 void tcp_socket_deserialize(packet* pac, char* str)
 {	char tmp;
+	//printf("Before deser:%s\n",str);
 	sscanf(str, 
-	"%d%c%c%c%d%c%d%c%d%c%d%c%d%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+	"%d%c%c%c%d%c%d%c%d%c%d%c%d%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%d",
 	
 	&(pac->msg), &tmp, &(pac->letter), &tmp, &(pac->x_coord), &tmp, &(pac->y_coord),
 		&tmp, &(pac->p1Points), &tmp, &(pac->p2Points), &tmp, &(pac->playerType),
@@ -120,10 +128,11 @@ void tcp_socket_deserialize(packet* pac, char* str)
 	&tmp, &(pac->currentBoard[3][0]), &tmp, &(pac->currentBoard[3][1]), &tmp, &(pac->currentBoard[3][2]), &tmp, &(pac->currentBoard[3][3]), &tmp, &(pac->currentBoard[3][4]), 
 	&tmp, &(pac->currentBoard[4][0]), &tmp, &(pac->currentBoard[4][1]), &tmp, &(pac->currentBoard[4][2]), &tmp, &(pac->currentBoard[4][3]), &tmp, &(pac->currentBoard[4][4]),
 	
-	&tmp, &(pac->tiles[0]), &tmp, &(pac->tiles[1]), &tmp, &(pac->tiles[2]), &tmp, &(pac->tiles[3]), &tmp, &(pac->tiles[4])
+	&tmp, &(pac->tiles[0]), &tmp, &(pac->tiles[1]), &tmp, &(pac->tiles[2]), &tmp, &(pac->tiles[3]), &tmp, &(pac->tiles[4]),&tmp,&(pac->isMatchOngoing)
 	
 
 	 );
-	 
+
+	//printf("After deser:%s\n",str);
 	// TODO separator check
 } 

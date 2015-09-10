@@ -151,7 +151,6 @@ int main(void) {
                 if(isAnyTileAvaliable == 1) {
                     points = 0;
                     gather_input(&c, &x, &y, &points, rec->tiles, rec->currentBoard);
-                    tmp->isMatchOngoing = 1;
                     /* Print updated points */
                     scrabble_game_print_title();
                     if (rec->playerType == FIRST) rec->p1Points += points;
@@ -169,7 +168,8 @@ int main(void) {
                     tmp->y_coord = y;
                     tmp->p1Points = rec->p1Points;
                     tmp->p2Points = rec->p2Points;
-
+                    tmp->isMatchOngoing = 1;
+                    printf("Right before sending packet: %d \n",tmp->isMatchOngoing);
                     tcp_socket_send_packet(s, tmp);
                     scrabble_game_print_wait_for_move();
                 }
@@ -180,14 +180,17 @@ int main(void) {
                     printf("Do you want to play another game?(Y/N)\n");
                     scanf(" %c", decission);
                     printf("%s \n",decission);
+                    tmp->isMatchOngoing = 2;
                     if (decission[0] == 'Y') {
                         tmp->msg = PLAY_ANOTHER_GAME;
-                        tmp->isMatchOngoing = 0;
+                       // tmp->isMatchOngoing = -1;
                         tcp_socket_send_packet(s, tmp);
                     }
                     else
                     {
                         tmp->msg = FINISH_GAME;
+                       // tmp->isMatchOngoing = -1;
+                        printf("isKURWAMatchOngoing = %d \n", tmp->isMatchOngoing);
                         tcp_socket_send_packet(s, tmp);
                         return EXIT_SUCCESS;
                         break;
