@@ -2,10 +2,6 @@
 
 void shared_mem_init(int* shmId, int size, char shmName)
 {
-	key_t key;
-	
-	key = ftok("./", shmName);
-	//printf("%s\n",key);
 	if((*shmId=shmget(IPC_PRIVATE, size, IPC_CREAT | 0777)) == -1 )
 	{
 		printf("semget error!init\n");

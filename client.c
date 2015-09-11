@@ -4,14 +4,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <string.h>
-#include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/un.h>
 #include <unistd.h>
 
 
-#include <sys/time.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <netdb.h>
@@ -95,13 +91,8 @@ int main(void) {
 	if(sethandler(sigterm_handler,SIGTERM)) ERR("Setting SIGTERM:");
 
     /*********  TCP IP  *********/
-
     s = connect_socket("localhost", 2000);
-    /****************************/
-    /*
-    socket_init_unix(&s,&remote, SOCK_PATH);   
-    socket_connect(&s,&remote);
-     * */
+
     printf("############################\n");
     printf("# WELCOME TO SCRABBLE GAME #\n");
     printf("############################\n");
@@ -190,7 +181,7 @@ int main(void) {
                     {
                         tmp->msg = FINISH_GAME;
                        // tmp->isMatchOngoing = -1;
-                        printf("isKURWAMatchOngoing = %d \n", tmp->isMatchOngoing);
+                        printf("isMatchOngoing = %d \n", tmp->isMatchOngoing);
                         tcp_socket_send_packet(s, tmp);
                         return EXIT_SUCCESS;
                         break;
@@ -228,27 +219,11 @@ int main(void) {
         }
     };
     printf("Disconnected\n");
-    close(s);
+    if(-1 == close(s)){
+        ERR("close");
+    }
     return 0;
 }
-
-/*void otherPlayerDisconnected(packet* msg,int s){
-        char* c;
-      printf("########################################\n");
-      printf("#            Connection lost!          #\n");
-      printf("########################################\n");
-      printf("Sorry but connection with other player is\n");
-      printf("lost. Do you want to play another game?(Y/N)\n");
-      scanf(" %c", c);
-      if(*c == 'Y'){
-          msg->msg = PLAY_ANOTHER_GAME;
-          
-      }
-      else if(*c == 'N'){
-         msg->msg = FINISH_GAME; 
-      }
-      tcp_socket_send_packet(s, msg);
-}*/
 
 void gather_input(char* c, int* x, int* y, int* points, char tiles[5], char board[5][5])
 {

@@ -55,18 +55,18 @@ void handle_client(int, int, PlayerInfo*,struct sockaddr_in);
 void cleanUp(packet*,packet*,game*,int*,int);
 void clearGameDataString(char*);
 
-int64_t bulk_write(FILE* fd, char *buf, size_t count){
-    printf("bulk write string:%s", buf);
-	int c;
-	size_t len=0;
-	do{
-		c=TEMP_FAILURE_RETRY(fwrite(*buf,sizeof(char),count,fd));
-		if(c<0) return c;
-		buf+=c;
-		len+=c;
-		count-=c;
-	}while(count>0);
-	return len ;
+ssize_t bulk_fwrite(FILE* fd, char *buf) {
+    int c;
+    size_t count = strlen(buf);
+    size_t len = 0;
+    do {
+        c = TEMP_FAILURE_RETRY(fwrite(buf, sizeof(char), strlen(buf), fd));
+        if (c < 0) return c;
+        buf += c;
+        len += c;
+        count -= c;
+    } while(count > 0);
+    return len ;
 }
 
 /*
@@ -190,6 +190,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
     int isThisClientDisconnected;
 
+    //variable indicating whether client server process should clean up
     int cleanUpMemoryBool;
 
     /* Control variable for connection lost. */
@@ -219,19 +220,22 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
          * 		NO PLAYER AWAITS
          * ********************************/
         if (waitingPlayer->status == NO_PLAYER && g_doWork) {
-            int i=0;
             
             time_t t = time(NULL);
             struct tm tm = *localtime(&t);
 
-            snprintf(fileName,GAME_DATA_ENTRY,"%d%d%d%d%d%d.dat\n\0", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+            snprintf(fileName,GAME_DATA_ENTRY,"%d%d%d%d%d%d.dat", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
             //writing ip and socket info to a file by first player in the game
             fd =fopen(fileName, "a");
             snprintf(gameData,GAME_DATA_ENTRY,"First player IP: %d and Socket:%d\n", (int)clientAddress.sin_addr.s_addr,(int)clientAddress.sin_port);
-            fwrite(gameData, sizeof(char), strlen(gameData), fd);
+            if(bulk_fwrite(fd,gameData)<0) ERR("write:");
             clearGameDataString(gameData);
-            fclose(fd);
+
+            if(0 != fclose(fd)){
+               ERR("fclose");
+            }
+
             /* Create game  in shared memory for future play */
             shared_mem_init(&scrabbleGameId, sizeof (game), 'G');
             scrabbleGameAddress = (game*) shared_mem_attach(scrabbleGameId);
@@ -307,11 +311,11 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 		 ******************************************/
 
         else if (g_doWork) {
-            /* Retrieve semaphore's and shared memory's ids. */
+            // Retrieve semaphore's and shared memory's ids.
             gameSemId = waitingPlayer->semId;
             scrabbleGameId = waitingPlayer->shmId;
-/*
-            /* Attach to the shared memory address. */
+
+            // Attach to the shared memory address.
             scrabbleGameAddress = (game*) shared_mem_attach(scrabbleGameId);
 
             /* Indicate that waiting queue is empty. */
@@ -330,9 +334,12 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             //writing ip and socket info to a file by second player
             fd =fopen(waitingPlayer->fileName, "a");
             snprintf(gameData,GAME_DATA_ENTRY,"Second player IP: %d and Socket:%d\n", (int)clientAddress.sin_addr.s_addr,(int)clientAddress.sin_port);
-            fwrite(gameData, sizeof(char), strlen(gameData), fd);
+            if(bulk_fwrite(fd,gameData)<0) ERR("write:");
             clearGameDataString(gameData);
-            fclose(fd);
+
+            if(0 != fclose(fd)){
+                ERR("fclose");
+            }
             
             /* Since this player moves second, send empty game board and tiles*/
             msg->msg = INFO;
@@ -468,7 +475,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                     scrabble_game_print_available_tiles(scrabbleGameAddress->avTiles, 25);
 
                     fd =fopen(waitingPlayer->fileName, "a");
-                    fwrite(gameData, sizeof(char), strlen(gameData), fd);
+                    if(bulk_fwrite(fd,gameData)<0) ERR("write:");
                     clearGameDataString(gameData);
                     fclose(fd);
 
@@ -517,7 +524,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                 } else if (msg->msg == FINISH_GAME) {
 
                     //If match has ended properly
-                    printf("is KURWA match ongoing: %d \n", msg->isMatchOngoing);
+                    printf("is  match ongoing: %d \n", msg->isMatchOngoing);
                     if(msg->isMatchOngoing == 2){
                         printf("Finish the game NIBY JAK TU WCHODZI!!!\n");
                         scrabbleGameAddress->didClientDisconnect = 0;
@@ -566,7 +573,8 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
     };
 
     printf("Closing descriptor \n");
-    close(clientDescriptor);
+    if(TEMP_FAILURE_RETRY(close(clientDescriptor))<0)ERR("close");
+
     //printf("isDisconnected = %d, dead = %d\n",isThisClientDisconnected, dead);
     if (isThisClientDisconnected && dead) {
         /* Clean up */
@@ -582,7 +590,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
         }
     }
-    //printf("SWAG\n");
+
 
 }
 void clearGameDataString(char* gameDataEntry){

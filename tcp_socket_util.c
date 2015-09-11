@@ -75,7 +75,7 @@ int tcp_socket_read_packet(int socket, packet* pac)
 		int t;
 		char serialized[200];
 		
-		if ((t = recv(socket, serialized, sizeof(serialized), 0))  == 0) 
+		if ((t = recv(socket, serialized, sizeof(serialized), 0))  == 0)
 		{
 			perror("Server closed connection\n");
 			return t;
