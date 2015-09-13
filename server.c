@@ -6,9 +6,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/un.h>
 #include <unistd.h>
-#include <string.h>
 
 /* Custom includes */
 #include "settings.h"
@@ -38,6 +36,8 @@ volatile sig_atomic_t g_doWork = 1;
  * For children's pids.
  */
 volatile sig_atomic_t children[MAX_CHILDREN];
+
+
 
 typedef struct
 {
@@ -91,13 +91,56 @@ void terminate_children();
  */
 void save_children_pid(int);
 
+void respond_to_move_data(int clientDescriptor, packet* msg, char* tmpGameData,char* gameData, int playerType,FILE* fd,game* scrabbleGameAddress, char* playerTiles, PlayerInfo* waitingPlayer,int gameSemId ){
+    int u;
+    printf("[Client %d] New letter: %c\n", clientDescriptor, msg->letter);
+    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] New letter: %c\n", gameData, clientDescriptor, msg->letter);
+    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
+
+    printf("[Client %d] Coordinates: (%d,%d)\n", clientDescriptor, msg->x_coord, msg->y_coord);
+    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] Coordinates: (%d,%d)\n", gameData,clientDescriptor, msg->x_coord, msg->y_coord);
+    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
+
+    printf("[Client %d] Tiles_returned: %c %c %c %c %c\n", clientDescriptor, msg->tiles[0],
+           msg->tiles[1], msg->tiles[2], msg->tiles[3], msg->tiles[4]);
+    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] Tiles_returned: %c %c %c %c %c\n", gameData, clientDescriptor, msg->tiles[0],
+             msg->tiles[1], msg->tiles[2], msg->tiles[3], msg->tiles[4]);
+    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
+
+    /* Update shared memory */
+    scrabbleGameAddress->gameBoard[msg->x_coord][msg->y_coord] = msg->letter;
+    scrabbleGameAddress->p1Points = msg->p1Points;
+    scrabbleGameAddress->p2Points = msg->p2Points;
+
+    /* Delete used tile */
+    for (u = 0; u < 5; u++)
+        if (playerTiles[u] == msg->letter) {
+            playerTiles[u] = 'x';
+            break;
+        }
+    printf("[Client %d] Tiles_current:  %c %c %c %c %c\n", clientDescriptor, playerTiles[0],
+           playerTiles[1], playerTiles[2], playerTiles[3], playerTiles[4]);
+    scrabble_game_print_available_tiles(scrabbleGameAddress->avTiles, 25);
+
+    fd =fopen(waitingPlayer->fileName, "a");
+    if(bulk_fwrite(fd,gameData)<0) ERR("write:");
+    clearGameDataString(gameData);
+    fclose(fd);
+
+    if (playerType == SECOND) {
+        semaphore_unlock(gameSemId, 1, 0);
+    } else {
+        semaphore_unlock(gameSemId, 2, 0);
+    }
+}
+
 /*
  * Core of the server.
  */
 int main(void)
 {
 	
-    int s, s2, pid, stackSem, waitingPlayerSocketId;
+    int serverSocket, clientSocket, pid, stackSem, waitingPlayerSocketId;
 
     
     PlayerInfo* waitingPlayerSocketAddress = NULL;
@@ -113,9 +156,9 @@ int main(void)
 	semaphore_init(&stackSem, 'E', 1);
 
 	/* Server socket */
-	tcp_socket_init_unix(&s, &local, SOCK_PATH);
-	tcp_socket_bind(&s, &local);
-	tcp_socket_listen(&s, INCOMMING_CONN);
+	tcp_socket_init_unix(&serverSocket, &local, SOCK_PATH);
+	tcp_socket_bind(&serverSocket, &local);
+	tcp_socket_listen(&serverSocket, INCOMMING_CONN);
 	
 	/* Set signals handlers */
 	if(sethandler(sigint_handler,SIGINT)) ERR("Setting SIGINT:");
@@ -124,10 +167,11 @@ int main(void)
     while(g_doWork) {
         printf("Waiting for a clients...\n");
         t = sizeof(remote);
-        if ((s2 =TEMP_FAILURE_RETRY(accept(s, (struct sockaddr *)&remote, &t))) <0) {
+        if ((clientSocket = TEMP_FAILURE_RETRY(accept(serverSocket, (struct sockaddr *)&remote, &t))) <0) {
             perror("accept");
-		//	break;
+			break;
         }
+
 
         printf("Connected.\n");
 
@@ -137,9 +181,8 @@ int main(void)
 				/* Set handler */
 				//if(sethandler(sigterm_handler,SIGTERM)) ERR("Setting SIGTERM:");
 				/* Save child's pid for parent */
-				//save_children_pid(getpid());
-				//if(sethandler(sigint_handler,SIGINT)) ERR("Setting SIGINT:");
-				handle_client(s2, stackSem, waitingPlayerSocketAddress,remote);
+				save_children_pid(getpid());
+				handle_client(clientSocket, stackSem, waitingPlayerSocketAddress,remote);
 				printf("Client with pid: %d disconnected.\n", getpid());
 				printf("Waiting for a clients'...\n");
 				return EXIT_SUCCESS;
@@ -154,6 +197,7 @@ int main(void)
         
     }
 	//terminate_children();
+    terminate_children();
 	printf("MAIN %d\n",getpid());
 	semaphore_remove(stackSem);
 	shared_mem_detach((char*)waitingPlayerSocketAddress);
@@ -237,6 +281,8 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             }
 
             /* Create game  in shared memory for future play */
+
+
             shared_mem_init(&scrabbleGameId, sizeof (game), 'G');
             scrabbleGameAddress = (game*) shared_mem_attach(scrabbleGameId);
             game newGame;
@@ -260,7 +306,6 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
             /* Inform client about changes */
             msg->msg = NO_PLAYER;
-            msg->isMatchOngoing = 1;
             tcp_socket_send_packet(clientDescriptor, msg);
 
             /* Save info for future player */
@@ -415,7 +460,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             /* Get new move. */
             int t;
 
-            /************************************************
+             /************************************************
              * 		 HANDLING DISCONNECTED CLIENT           
              * **********************************************/
             if ((t = tcp_socket_read_packet(clientDescriptor, msg)) <= 0) {
@@ -441,8 +486,6 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                 g_doWork = 0;
             }  
              else {
-                //  tcp_socket_read_packet(clientDescriptor, msg);
-                printf("Right after reading packet: %d \n",msg->isMatchOngoing);
                 if (msg->msg == MOVE_DATA) {
                     printf("[Client %d] New letter: %c\n", clientDescriptor, msg->letter);
                     snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] New letter: %c\n", gameData, clientDescriptor, msg->letter);
@@ -486,7 +529,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                     }
 
                 } else if (msg->msg == PLAY_ANOTHER_GAME) {
-                    if(msg->isMatchOngoing == 2){
+                    if(msg->isMatchOngoing == -1){
                         scrabbleGameAddress->didClientDisconnect = 0;
                         dead = 1;
                         g_doWork = 1;
@@ -525,7 +568,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
                     //If match has ended properly
                     printf("is  match ongoing: %d \n", msg->isMatchOngoing);
-                    if(msg->isMatchOngoing == 2){
+                    if(msg->isMatchOngoing == -1){
                         printf("Finish the game NIBY JAK TU WCHODZI!!!\n");
                         scrabbleGameAddress->didClientDisconnect = 0;
                         dead = 1;
@@ -610,6 +653,7 @@ void cleanUp(packet* msg,packet* msg2,game* scrabbleGameAddress,int*scrabbleGame
 
 void sigint_handler(int sig) {
 	g_doWork = 0;
+    printf("SIGINT\n");
 }
 
 void sigterm_handler(int sig)
@@ -619,6 +663,7 @@ void sigterm_handler(int sig)
 
 
 void sigchld_handler(int sig) {
+    g_doWork =0;
 	while(waitpid(-1, NULL, WNOHANG) > 0);
 }
 

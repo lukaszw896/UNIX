@@ -23,9 +23,9 @@ typedef struct
 	int p1Points;
 	int p2Points;
 	int playerType;
+	int isMatchOngoing;
 	char currentBoard[BOARD_HEIGHT][BOARD_WIDTH];
 	char tiles[5];
-	int isMatchOngoing;
 } packet;
 
 /*
