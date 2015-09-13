@@ -1,59 +1,6 @@
-#define _GNU_SOURCE 
-/* System includes */
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <unistd.h>
+#include "server.h"
 
-/* Custom includes */
-#include "settings.h"
-#include "signals_util.h"
-#include "tcp_socket_util.h"
-#include "semaphore_util.h"
-#include "shared_mem_util.h"
-#include "scrabble_game.h"
-
-/*****	tcp  *******/
-#include <sys/time.h>
-#include <netinet/in.h>
-#include <signal.h>
-#include <netdb.h>
-#include <fcntl.h>
-
-#define BACKLOG 3
-#define GAME_DATA_ENTRY 3000
-#define LOG_FILE_NAME "LogFile.dat"
-/*
- * When SIGINT is catched, this variable will tell main loop to stop.
- */
-volatile sig_atomic_t g_doWork = 1;
-
-/*       Host to network / network to host      */
-/*
- * For children's pids.
- */
-volatile sig_atomic_t children[MAX_CHILDREN];
-
-
-
-typedef struct
-{
-	int status;
-	int shmId;
-	int semId;
-    FILE* fd;
-    char fileName[GAME_DATA_ENTRY];
-} PlayerInfo;
-
-/*
- * Each client after accepting, gets his own process and permorms this function.
- */
-void handle_client(int, int, PlayerInfo*,struct sockaddr_in);
-void cleanUp(packet*,game*,int,int);
-void clearGameDataString(char*);
+void client_is_disconnected(int clientDescriptor,game* scrabbleGameAddress,int* isThisClientDisconnected, int playerType, int gameSemId,int* dead);
 
 ssize_t bulk_fwrite(FILE* fd, char *buf) {
     int c;
@@ -67,70 +14,6 @@ ssize_t bulk_fwrite(FILE* fd, char *buf) {
         count -= c;
     } while(count > 0);
     return len ;
-}
-
-/*
- * When server process has been interrupted shared memory must be realesed.
- */
-void sigint_handler(int sig);
-
-/*
- * TODO
- */
-void sigterm_handler(int);
-
-void sigchld_handler(int);
-
-/*
- * In case of server's death, all subprocesses must be killed.
- */
-void terminate_children();
-
-/*
- * Store child's pid in children[].
- */
-void save_children_pid(int);
-
-/*
- * Function which is a response to MOVE_DATA client message
- */
-void respond_to_move_data(int clientDescriptor, packet* msg, char* tmpGameData,char* gameData, int playerType,FILE* fd,game* scrabbleGameAddress, char* playerTiles, PlayerInfo* waitingPlayer,int gameSemId );
-
-void respond_to_play_another_game(packet* msg,game* scrabbleGameAddress,int* dead,int playerType,int gameSemId,int clientDescriptor, int* cleanUpMemoryBool, int scrabbleGameId){
-    if(msg->isMatchOngoing == -1){
-        scrabbleGameAddress->didClientDisconnect = 0;
-        *dead = 1;
-        g_doWork = 1;
-        if (playerType == SECOND) {
-            semaphore_unlock(gameSemId, 1, 0);
-        }
-        else {
-            printf("Cleaning up memory by client server:[%d] in Play another game match is ongoing \n",
-                   clientDescriptor);
-            printf("[cleanUpMemoryBool] = %d\n", *cleanUpMemoryBool);
-            if (cleanUpMemoryBool) {
-
-                cleanUp(msg,  scrabbleGameAddress, scrabbleGameId, gameSemId);
-                *cleanUpMemoryBool = 0;
-            }
-        }
-    }
-    else {
-        printf("play another game!!!\n");
-        /***test***/
-        scrabbleGameAddress->didClientDisconnect = 0;
-        *dead = 1;
-        g_doWork = 1;
-        printf("[cleanUpMemoryBool] = %d\n", *cleanUpMemoryBool);
-        if (cleanUpMemoryBool) {
-            printf("CLEAN UP memory by client server:[%d] in Play another game match is not ongoing\n",
-                   clientDescriptor);
-
-            cleanUp(msg,  scrabbleGameAddress, scrabbleGameId, gameSemId);
-            *cleanUpMemoryBool = 0;
-        }
-
-    }
 }
 
 /*
@@ -164,11 +47,13 @@ int main(void)
 	if(sethandler(sigchld_handler,SIGCHLD)) ERR("Setting SIGCHLD:");
 	if(sethandler(sigterm_handler,SIGTERM)) ERR("Setting SIGTERM:");
     while(g_doWork) {
+        /* Save child's pid for parent */
+        save_children_pid(pid);
         printf("Waiting for a clients...\n");
         t = sizeof(remote);
         if ((clientSocket = TEMP_FAILURE_RETRY(accept(serverSocket, (struct sockaddr *)&remote, &t))) <0) {
             perror("accept");
-			//break;
+			break;
         }
 
 
@@ -177,10 +62,6 @@ int main(void)
 		switch(pid = fork())
 		{
 			case 0:
-				/* Set handler */
-				//if(sethandler(sigterm_handler,SIGTERM)) ERR("Setting SIGTERM:");
-				/* Save child's pid for parent */
-				save_children_pid(getpid());
 				handle_client(clientSocket, stackSem, waitingPlayerSocketAddress,remote);
 				printf("Client with pid: %d disconnected.\n", getpid());
 				printf("Waiting for a clients'...\n");
@@ -195,7 +76,6 @@ int main(void)
 		}
         
     }
-	//terminate_children();
     terminate_children();
 	printf("MAIN %d\n",getpid());
 	semaphore_remove(stackSem);
@@ -455,33 +335,14 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                 printf("[Client %d] P1 points: %d P2 points: %d\n", clientDescriptor, msg->p1Points, msg->p2Points);
                 tcp_socket_send_packet(clientDescriptor, msg);
             }
-            /* Get new move. */
+            /*
+             * Getting a new move from client
+             */
             int t;
 
-             /************************************************
-             * 		 HANDLING DISCONNECTED CLIENT           
-             * **********************************************/
             if ((t = tcp_socket_read_packet(clientDescriptor, msg)) <= 0) {
-                printf("Client %d Disconnected\n", clientDescriptor);
-                // if another player client was not disconnected than we don't want to clear anything yet
-                if(scrabbleGameAddress->didClientDisconnect == 0) {
-                    scrabbleGameAddress->didClientDisconnect = 1;
-                    isThisClientDisconnected = 0;
-                }
-                else{
-                    isThisClientDisconnected = 1;
-                }
-
-                //cleanUpMemoryBool=0;
-
-                if (playerType == SECOND) {
-                    semaphore_unlock(gameSemId, 1, 0);
-                } else {
-                    semaphore_unlock(gameSemId, 2, 0);
-                }
-                dead = 1;
-
-                g_doWork = 0;
+                //if client was disconnected than...
+                client_is_disconnected(clientDescriptor,scrabbleGameAddress,&isThisClientDisconnected,playerType,gameSemId,&dead);
             }  
              else {
                 if (msg->msg == MOVE_DATA) {
@@ -489,54 +350,16 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                     respond_to_move_data(clientDescriptor, msg, tmpGameData, gameData, playerType, fd, scrabbleGameAddress, playerTiles, waitingPlayer, gameSemId);
 
                 } else if (msg->msg == PLAY_ANOTHER_GAME) {
-                    
+
                     respond_to_play_another_game(msg,scrabbleGameAddress,&dead,playerType,gameSemId,clientDescriptor, &cleanUpMemoryBool, scrabbleGameId);
 
                 } else if (msg->msg == FINISH_GAME) {
 
-                    //If match has ended properly
-                    if(msg->isMatchOngoing == -1){
+                    respond_to_finish_the_game(msg, scrabbleGameAddress, &dead, playerType, gameSemId, &cleanUpMemoryBool, scrabbleGameId);
 
-                        scrabbleGameAddress->didClientDisconnect = 0;
-                        dead = 1;
-                        g_doWork = 0;
-                        if (playerType == SECOND) {
-                            semaphore_unlock(gameSemId, 1, 0);
-                        }
-                        else {
-                            printf("[cleanUpMemoryBool] = %d\n", cleanUpMemoryBool);
-                            if (cleanUpMemoryBool) {
-                                printf("CLEAN UP memory by client server:[%d] in Finish the game FIRST PLAYER match is not ongoing\n",
-                                       clientDescriptor);
-
-                                cleanUp(msg, scrabbleGameAddress, scrabbleGameId, gameSemId);
-                                cleanUpMemoryBool = 0;
-                            }
-                        }
-                    }
-                        //if one of the players left
-                    else {
-                        printf("Finish the game!!!\n");
-                        /***test***/
-                        scrabbleGameAddress->didClientDisconnect = 0;
-                        dead = 1;
-                        g_doWork = 0;
-
-                        printf("[cleanUpMemoryBool] = %d \n", cleanUpMemoryBool);
-                        printf("TEST\n");
-                        if (cleanUpMemoryBool) {
-                            printf("CLEAN UP memory by client server:[%d] in Finish the game, match is not ongoing \n",
-                                   clientDescriptor);
-                            cleanUp(msg, scrabbleGameAddress, scrabbleGameId, gameSemId);
-                            cleanUpMemoryBool = 0;
-                        }
-
-                    }
                 } else
                     printf("[Client %d] Error in packet sent from client.", clientDescriptor);
 
-
-                printf("unlocked properly!!!\n");
             }
 
         }
@@ -607,6 +430,85 @@ void respond_to_move_data(int clientDescriptor, packet* msg, char* tmpGameData,c
     }
 }
 
+void respond_to_play_another_game(packet* msg,game* scrabbleGameAddress,int* dead,int playerType,int gameSemId,int clientDescriptor, int* cleanUpMemoryBool, int scrabbleGameId){
+    if(msg->isMatchOngoing == -1){
+        scrabbleGameAddress->didClientDisconnect = 0;
+        *dead = 1;
+        g_doWork = 1;
+        if (playerType == SECOND) {
+            semaphore_unlock(gameSemId, 1, 0);
+        }
+        else {
+            if (cleanUpMemoryBool) {
+
+                cleanUp(msg,  scrabbleGameAddress, scrabbleGameId, gameSemId);
+                *cleanUpMemoryBool = 0;
+            }
+        }
+    }
+    else {
+        scrabbleGameAddress->didClientDisconnect = 0;
+        *dead = 1;
+        g_doWork = 1;
+        if (cleanUpMemoryBool) {
+            cleanUp(msg,  scrabbleGameAddress, scrabbleGameId, gameSemId);
+            *cleanUpMemoryBool = 0;
+        }
+
+    }
+}
+
+void respond_to_finish_the_game(packet* msg,game* scrabbleGameAddress,int* dead,int playerType,int gameSemId,int* cleanUpMemoryBool, int scrabbleGameId){
+    //If match has ended properly
+    if(msg->isMatchOngoing == -1){
+
+        scrabbleGameAddress->didClientDisconnect = 0;
+        *dead = 1;
+        g_doWork = 0;
+        if (playerType == SECOND) {
+            semaphore_unlock(gameSemId, 1, 0);
+        }
+        else {
+            if (*cleanUpMemoryBool) {
+                cleanUp(msg, scrabbleGameAddress, scrabbleGameId, gameSemId);
+                *cleanUpMemoryBool = 0;
+            }
+        }
+    }
+        //if one of the players left
+    else {
+        scrabbleGameAddress->didClientDisconnect = 0;
+        *dead = 1;
+        g_doWork = 0;
+
+        if (*cleanUpMemoryBool) {
+            cleanUp(msg, scrabbleGameAddress, scrabbleGameId, gameSemId);
+            *cleanUpMemoryBool = 0;
+        }
+
+    }
+}
+void client_is_disconnected(int clientDescriptor,game* scrabbleGameAddress,int* isThisClientDisconnected, int playerType, int gameSemId,int* dead){
+    printf("Client %d Disconnected\n", clientDescriptor);
+    // if another player client was not disconnected than we don't want to clear anything yet
+    if(scrabbleGameAddress->didClientDisconnect == 0) {
+        scrabbleGameAddress->didClientDisconnect = 1;
+        *isThisClientDisconnected = 0;
+    }
+    else{
+        *isThisClientDisconnected = 1;
+    }
+
+    if (playerType == SECOND) {
+        semaphore_unlock(gameSemId, 1, 0);
+    } else {
+        semaphore_unlock(gameSemId, 2, 0);
+    }
+
+    *dead = 1;
+    g_doWork = 0;
+}
+
 void clearGameDataString(char* gameDataEntry){
     int i;
     for(i=0;i<GAME_DATA_ENTRY;i++){
@@ -631,10 +533,8 @@ void sigterm_handler(int sig)
 	g_doWork = 0;
 }
 
-
 void sigchld_handler(int sig) {
 	while(waitpid(-1, NULL, WNOHANG) > 0);
-  //  g_doWork =0;
 }
 
 void terminate_children()
@@ -659,9 +559,7 @@ void save_children_pid(int pid)
 	while(children[i] != 0)	i++;
 	
 	children[i] = pid;
-	
-	//print
-	for(i = 0; i < 100; i++) printf("%d ", children[i]);
+
 }
 
 

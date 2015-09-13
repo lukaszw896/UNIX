@@ -16,23 +16,15 @@ void tcp_socket_init_unix(int *descriptor, struct sockaddr_in* soc, char* name)
 
 void tcp_socket_bind(int* descriptor, struct sockaddr_in* soc)
 {
-	//int len;
 	int t=1;
 
-    //len = strlen(soc->sun_path) + sizeof(soc->sun_family);
-    
-	//unlink(soc->sun_path);
 	
 	if (setsockopt(*descriptor, SOL_SOCKET, SO_REUSEADDR,&t, sizeof(t))) ERR("setsockopt");
 	if(bind(*descriptor,(const struct sockaddr*) soc,sizeof(*soc)) < 0) {
 		 ERR("bind");
 		 exit(1);
 	 }
-	
-    /*if (bind(*descriptor, (struct sockaddr *)soc, len) == -1) {
-        perror("bind");
-        exit(1);
-    }*/
+
 }
 
 void tcp_socket_connect(int* descriptor, struct sockaddr_in* soc)
@@ -60,7 +52,6 @@ void tcp_socket_listen(int* descriptor, int incomingConn)
 void tcp_socket_send_packet(int socket, packet* pac)
 {
 	char serialized[200];
-	//printf("In send packet: %d \n",pac->isMatchOngoing);
 	tcp_socket_serialize(*pac, serialized);
 
 	if(send(socket, serialized, sizeof(serialized),0) == -1)
@@ -85,16 +76,14 @@ int tcp_socket_read_packet(int socket, packet* pac)
         }
 
         tcp_socket_deserialize(pac, serialized);
-	printf("Right after deserialization: %d\n",pac->isMatchOngoing);
         return t;
 }
 
 
 ///// HTON
-// HARDCODED FOR NOW
+
 void tcp_socket_serialize(packet pac, char* str)
 {
-	//printf("Right before serilizing = %d\n",pac.isMatchOngoing);
 	sprintf(str, 
 	"%d%c%c%c%d%c%d%c%d%c%d%c%d%c%d%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
 	
@@ -110,12 +99,10 @@ void tcp_socket_serialize(packet pac, char* str)
 	SEPARATOR, pac.tiles[0], SEPARATOR, pac.tiles[1], SEPARATOR, pac.tiles[2], SEPARATOR, pac.tiles[3], SEPARATOR, pac.tiles[4]
 
 	);
-	//printf("Serialize:%s\n",str);
 } 
-// HARDCODED FOR NOW
+
 void tcp_socket_deserialize(packet* pac, char* str)
 {	char tmp;
-	//printf("Before deser:%s\n",str);
 	sscanf(str, 
 	"%d%c%c%c%d%c%d%c%d%c%d%c%d%c%d%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
 	
@@ -132,7 +119,4 @@ void tcp_socket_deserialize(packet* pac, char* str)
 	
 
 	 );
-
-	//printf("After deser:%s\n",str);
-	// TODO separator check
 } 
