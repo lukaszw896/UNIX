@@ -52,7 +52,7 @@ typedef struct
  * Each client after accepting, gets his own process and permorms this function.
  */
 void handle_client(int, int, PlayerInfo*,struct sockaddr_in);
-void cleanUp(packet*,packet*,game*,int*,int);
+void cleanUp(packet*,game*,int,int);
 void clearGameDataString(char*);
 
 ssize_t bulk_fwrite(FILE* fd, char *buf) {
@@ -91,46 +91,45 @@ void terminate_children();
  */
 void save_children_pid(int);
 
-void respond_to_move_data(int clientDescriptor, packet* msg, char* tmpGameData,char* gameData, int playerType,FILE* fd,game* scrabbleGameAddress, char* playerTiles, PlayerInfo* waitingPlayer,int gameSemId ){
-    int u;
-    printf("[Client %d] New letter: %c\n", clientDescriptor, msg->letter);
-    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] New letter: %c\n", gameData, clientDescriptor, msg->letter);
-    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
+/*
+ * Function which is a response to MOVE_DATA client message
+ */
+void respond_to_move_data(int clientDescriptor, packet* msg, char* tmpGameData,char* gameData, int playerType,FILE* fd,game* scrabbleGameAddress, char* playerTiles, PlayerInfo* waitingPlayer,int gameSemId );
 
-    printf("[Client %d] Coordinates: (%d,%d)\n", clientDescriptor, msg->x_coord, msg->y_coord);
-    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] Coordinates: (%d,%d)\n", gameData,clientDescriptor, msg->x_coord, msg->y_coord);
-    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
-
-    printf("[Client %d] Tiles_returned: %c %c %c %c %c\n", clientDescriptor, msg->tiles[0],
-           msg->tiles[1], msg->tiles[2], msg->tiles[3], msg->tiles[4]);
-    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] Tiles_returned: %c %c %c %c %c\n", gameData, clientDescriptor, msg->tiles[0],
-             msg->tiles[1], msg->tiles[2], msg->tiles[3], msg->tiles[4]);
-    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
-
-    /* Update shared memory */
-    scrabbleGameAddress->gameBoard[msg->x_coord][msg->y_coord] = msg->letter;
-    scrabbleGameAddress->p1Points = msg->p1Points;
-    scrabbleGameAddress->p2Points = msg->p2Points;
-
-    /* Delete used tile */
-    for (u = 0; u < 5; u++)
-        if (playerTiles[u] == msg->letter) {
-            playerTiles[u] = 'x';
-            break;
+void respond_to_play_another_game(packet* msg,game* scrabbleGameAddress,int* dead,int playerType,int gameSemId,int clientDescriptor, int* cleanUpMemoryBool, int scrabbleGameId){
+    if(msg->isMatchOngoing == -1){
+        scrabbleGameAddress->didClientDisconnect = 0;
+        *dead = 1;
+        g_doWork = 1;
+        if (playerType == SECOND) {
+            semaphore_unlock(gameSemId, 1, 0);
         }
-    printf("[Client %d] Tiles_current:  %c %c %c %c %c\n", clientDescriptor, playerTiles[0],
-           playerTiles[1], playerTiles[2], playerTiles[3], playerTiles[4]);
-    scrabble_game_print_available_tiles(scrabbleGameAddress->avTiles, 25);
+        else {
+            printf("Cleaning up memory by client server:[%d] in Play another game match is ongoing \n",
+                   clientDescriptor);
+            printf("[cleanUpMemoryBool] = %d\n", *cleanUpMemoryBool);
+            if (cleanUpMemoryBool) {
 
-    fd =fopen(waitingPlayer->fileName, "a");
-    if(bulk_fwrite(fd,gameData)<0) ERR("write:");
-    clearGameDataString(gameData);
-    fclose(fd);
+                cleanUp(msg,  scrabbleGameAddress, scrabbleGameId, gameSemId);
+                *cleanUpMemoryBool = 0;
+            }
+        }
+    }
+    else {
+        printf("play another game!!!\n");
+        /***test***/
+        scrabbleGameAddress->didClientDisconnect = 0;
+        *dead = 1;
+        g_doWork = 1;
+        printf("[cleanUpMemoryBool] = %d\n", *cleanUpMemoryBool);
+        if (cleanUpMemoryBool) {
+            printf("CLEAN UP memory by client server:[%d] in Play another game match is not ongoing\n",
+                   clientDescriptor);
 
-    if (playerType == SECOND) {
-        semaphore_unlock(gameSemId, 1, 0);
-    } else {
-        semaphore_unlock(gameSemId, 2, 0);
+            cleanUp(msg,  scrabbleGameAddress, scrabbleGameId, gameSemId);
+            *cleanUpMemoryBool = 0;
+        }
+
     }
 }
 
@@ -169,7 +168,7 @@ int main(void)
         t = sizeof(remote);
         if ((clientSocket = TEMP_FAILURE_RETRY(accept(serverSocket, (struct sockaddr *)&remote, &t))) <0) {
             perror("accept");
-			break;
+			//break;
         }
 
 
@@ -222,7 +221,6 @@ int main(void)
 void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer,struct sockaddr_in clientAddress) {
 
     packet* msg = malloc(sizeof (packet));
-    packet* msg2 = malloc(sizeof (packet));
     game* scrabbleGameAddress = NULL;
     FILE* fd = NULL;
     char playerTiles[5] = {'x', 'x', 'x', 'x', 'x'};
@@ -245,7 +243,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
     while (g_doWork) {
         msg = malloc(sizeof (packet));
-        msg2 = malloc(sizeof (packet));
+        msg->isMatchOngoing = 1;
         scrabbleGameAddress = NULL;
         //playerTiles = {'x', 'x', 'x', 'x', 'x'};
         playerTiles[0] = 'x';
@@ -487,89 +485,18 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             }  
              else {
                 if (msg->msg == MOVE_DATA) {
-                    printf("[Client %d] New letter: %c\n", clientDescriptor, msg->letter);
-                    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] New letter: %c\n", gameData, clientDescriptor, msg->letter);
-                    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
 
-                    printf("[Client %d] Coordinates: (%d,%d)\n", clientDescriptor, msg->x_coord, msg->y_coord);
-                    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] Coordinates: (%d,%d)\n", gameData,clientDescriptor, msg->x_coord, msg->y_coord);
-                    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
-
-                    printf("[Client %d] Tiles_returned: %c %c %c %c %c\n", clientDescriptor, msg->tiles[0],
-                            msg->tiles[1], msg->tiles[2], msg->tiles[3], msg->tiles[4]);
-                    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] Tiles_returned: %c %c %c %c %c\n", gameData, clientDescriptor, msg->tiles[0],
-                             msg->tiles[1], msg->tiles[2], msg->tiles[3], msg->tiles[4]);
-                    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
-
-                    /* Update shared memory */
-                    scrabbleGameAddress->gameBoard[msg->x_coord][msg->y_coord] = msg->letter;
-                    scrabbleGameAddress->p1Points = msg->p1Points;
-                    scrabbleGameAddress->p2Points = msg->p2Points;
-
-
-                    /* Delete used tile */
-                    for (u = 0; u < 5; u++)
-                        if (playerTiles[u] == msg->letter) {
-                            playerTiles[u] = 'x';
-                            break;
-                        }
-                    printf("[Client %d] Tiles_current:  %c %c %c %c %c\n", clientDescriptor, playerTiles[0],
-                            playerTiles[1], playerTiles[2], playerTiles[3], playerTiles[4]);
-                    scrabble_game_print_available_tiles(scrabbleGameAddress->avTiles, 25);
-
-                    fd =fopen(waitingPlayer->fileName, "a");
-                    if(bulk_fwrite(fd,gameData)<0) ERR("write:");
-                    clearGameDataString(gameData);
-                    fclose(fd);
-
-                    if (playerType == SECOND) {
-                        semaphore_unlock(gameSemId, 1, 0);
-                    } else {
-                        semaphore_unlock(gameSemId, 2, 0);
-                    }
+                    respond_to_move_data(clientDescriptor, msg, tmpGameData, gameData, playerType, fd, scrabbleGameAddress, playerTiles, waitingPlayer, gameSemId);
 
                 } else if (msg->msg == PLAY_ANOTHER_GAME) {
-                    if(msg->isMatchOngoing == -1){
-                        scrabbleGameAddress->didClientDisconnect = 0;
-                        dead = 1;
-                        g_doWork = 1;
-                        if (playerType == SECOND) {
-                            semaphore_unlock(gameSemId, 1, 0);
-                        }
-                        else {
-                            printf("Cleaning up memory by client server:[%d] in Play another game match is ongoing \n",
-                                   clientDescriptor);
-                            printf("[cleanUpMemoryBool] = %d\n", cleanUpMemoryBool);
-                            if (cleanUpMemoryBool) {
-
-                                cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
-                                cleanUpMemoryBool = 0;
-                            }
-                        }
-                    }
-                    else {
-                        printf("play another game!!!\n");
-                        /***test***/
-                        scrabbleGameAddress->didClientDisconnect = 0;
-                        dead = 1;
-                        g_doWork = 1;
-                        printf("[cleanUpMemoryBool] = %d\n", cleanUpMemoryBool);
-                        if (cleanUpMemoryBool) {
-                            printf("CLEAN UP memory by client server:[%d] in Play another game match is not ongoing\n",
-                                   clientDescriptor);
-
-                            cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
-                            cleanUpMemoryBool = 0;
-                        }
-
-                    }
+                    
+                    respond_to_play_another_game(msg,scrabbleGameAddress,&dead,playerType,gameSemId,clientDescriptor, &cleanUpMemoryBool, scrabbleGameId);
 
                 } else if (msg->msg == FINISH_GAME) {
 
                     //If match has ended properly
-                    printf("is  match ongoing: %d \n", msg->isMatchOngoing);
                     if(msg->isMatchOngoing == -1){
-                        printf("Finish the game NIBY JAK TU WCHODZI!!!\n");
+
                         scrabbleGameAddress->didClientDisconnect = 0;
                         dead = 1;
                         g_doWork = 0;
@@ -582,7 +509,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                                 printf("CLEAN UP memory by client server:[%d] in Finish the game FIRST PLAYER match is not ongoing\n",
                                        clientDescriptor);
 
-                                cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
+                                cleanUp(msg, scrabbleGameAddress, scrabbleGameId, gameSemId);
                                 cleanUpMemoryBool = 0;
                             }
                         }
@@ -600,7 +527,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                         if (cleanUpMemoryBool) {
                             printf("CLEAN UP memory by client server:[%d] in Finish the game, match is not ongoing \n",
                                    clientDescriptor);
-                            cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
+                            cleanUp(msg, scrabbleGameAddress, scrabbleGameId, gameSemId);
                             cleanUpMemoryBool = 0;
                         }
 
@@ -629,13 +556,57 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
         if(cleanUpMemoryBool) {
             printf("CLEAN UP memory by client server:[%d] at the very end of server child process \n",
                    clientDescriptor);
-            cleanUp(msg, msg2, scrabbleGameAddress, &scrabbleGameId, gameSemId);
+            cleanUp(msg, scrabbleGameAddress, scrabbleGameId, gameSemId);
 
         }
     }
 
 
 }
+
+void respond_to_move_data(int clientDescriptor, packet* msg, char* tmpGameData,char* gameData, int playerType,FILE* fd,game* scrabbleGameAddress, char* playerTiles, PlayerInfo* waitingPlayer,int gameSemId ){
+    int u;
+    printf("[Client %d] New letter: %c\n", clientDescriptor, msg->letter);
+    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] New letter: %c\n", gameData, clientDescriptor, msg->letter);
+    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
+
+    printf("[Client %d] Coordinates: (%d,%d)\n", clientDescriptor, msg->x_coord, msg->y_coord);
+    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] Coordinates: (%d,%d)\n", gameData,clientDescriptor, msg->x_coord, msg->y_coord);
+    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
+
+    printf("[Client %d] Tiles_returned: %c %c %c %c %c\n", clientDescriptor, msg->tiles[0],
+           msg->tiles[1], msg->tiles[2], msg->tiles[3], msg->tiles[4]);
+    snprintf(tmpGameData,GAME_DATA_ENTRY,"%s[Client %d] Tiles_returned: %c %c %c %c %c\n", gameData, clientDescriptor, msg->tiles[0],
+             msg->tiles[1], msg->tiles[2], msg->tiles[3], msg->tiles[4]);
+    snprintf(gameData,GAME_DATA_ENTRY,"%s", tmpGameData);
+
+    /* Update shared memory */
+    scrabbleGameAddress->gameBoard[msg->x_coord][msg->y_coord] = msg->letter;
+    scrabbleGameAddress->p1Points = msg->p1Points;
+    scrabbleGameAddress->p2Points = msg->p2Points;
+
+    /* Delete used tile */
+    for (u = 0; u < 5; u++)
+        if (playerTiles[u] == msg->letter) {
+            playerTiles[u] = 'x';
+            break;
+        }
+    printf("[Client %d] Tiles_current:  %c %c %c %c %c\n", clientDescriptor, playerTiles[0],
+           playerTiles[1], playerTiles[2], playerTiles[3], playerTiles[4]);
+    scrabble_game_print_available_tiles(scrabbleGameAddress->avTiles, 25);
+
+    fd =fopen(waitingPlayer->fileName, "a");
+    if(bulk_fwrite(fd,gameData)<0) ERR("write:");
+    clearGameDataString(gameData);
+    fclose(fd);
+
+    if (playerType == SECOND) {
+        semaphore_unlock(gameSemId, 1, 0);
+    } else {
+        semaphore_unlock(gameSemId, 2, 0);
+    }
+}
+
 void clearGameDataString(char* gameDataEntry){
     int i;
     for(i=0;i<GAME_DATA_ENTRY;i++){
@@ -643,11 +614,10 @@ void clearGameDataString(char* gameDataEntry){
     }
 }
 
-void cleanUp(packet* msg,packet* msg2,game* scrabbleGameAddress,int*scrabbleGameId,int gameSemId){
+void cleanUp(packet* msg,game* scrabbleGameAddress,int scrabbleGameId,int gameSemId){
         free(msg);
-        free(msg2);
         shared_mem_detach((char*) scrabbleGameAddress);
-        shared_mem_delete(*scrabbleGameId);
+        shared_mem_delete(scrabbleGameId);
         semaphore_remove(gameSemId);
 }
 
@@ -663,8 +633,8 @@ void sigterm_handler(int sig)
 
 
 void sigchld_handler(int sig) {
-    g_doWork =0;
 	while(waitpid(-1, NULL, WNOHANG) > 0);
+  //  g_doWork =0;
 }
 
 void terminate_children()
@@ -693,3 +663,5 @@ void save_children_pid(int pid)
 	//print
 	for(i = 0; i < 100; i++) printf("%d ", children[i]);
 }
+
+
