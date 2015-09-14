@@ -1,6 +1,6 @@
 #include "shared_mem_util.h"
 
-void shared_mem_init(int* shmId, int size, char shmName)
+void shared_mem_init(int* shmId, int size)
 {
 	if((*shmId=shmget(IPC_PRIVATE, size, IPC_CREAT | 0777)) == -1 )
 	{

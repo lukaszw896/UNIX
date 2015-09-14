@@ -79,7 +79,13 @@ int main(void) {
     char decission[50];
     int s, sem;
     packet* rec = malloc(sizeof (packet));
+    if(rec == NULL){
+        ERR("malloc");
+    }
     packet* tmp = malloc(sizeof (packet));
+    if(tmp == NULL){
+        ERR("malloc");
+    }
     char c;
     int x, y, points,i;
     int isAnyTileAvaliable;
@@ -93,9 +99,9 @@ int main(void) {
     /*********  TCP IP  *********/
     s = connect_socket("localhost", 2000);
 
-    printf("############################\n");
-    printf("# WELCOME TO SCRABBLE GAME #\n");
-    printf("############################\n");
+    printf("##############################\n");
+    printf("## WELCOME TO SCRABBLE GAME ##\n");
+    printf("##############################\n");
 
 
     while (g_doWork) {
@@ -164,9 +170,9 @@ int main(void) {
                     scrabble_game_print_wait_for_move();
                 }
                 else{
-                    printf("########################################\n");
-                    printf("#             END OF MATCH             #\n");
-                    printf("########################################\n");
+                    printf("##########################################\n");
+                    printf("##             END OF MATCH             ##\n");
+                    printf("##########################################\n");
                     printf("Do you want to play another game?(Y/N)\n");
                     scanf(" %c", decission);
                     printf("%s \n",decission);
@@ -187,9 +193,9 @@ int main(void) {
                 break;
             case DISCONNECTED:
 
-                printf("########################################\n");
-                printf("#            Connection lost!          #\n");
-                printf("########################################\n");
+                printf("##########################################\n");
+                printf("##            Connection lost!          ##\n");
+                printf("##########################################\n");
                 printf("Sorry but connection with other player is\n");
                 printf("lost. Do you want to play another game?(Y/N)\n");
                 scanf(" %c", decission);
@@ -226,7 +232,7 @@ void gather_input(char* c, int* x, int* y, int* points, char tiles[5], char boar
 {
 	int i, k, j;
 	
-	printf("Supply <letter> <x> <y>\n");
+	printf("Supply <letter> <y> <x>\n");
 	while(1)
 	{
 		scanf(" %c %d %d", c, x, y);
@@ -241,7 +247,7 @@ void gather_input(char* c, int* x, int* y, int* points, char tiles[5], char boar
 		/* Check if given character is on the list */
 		k = 1;
 		for(i = 0; i < 5; i++)
-			if(tiles[i] == *c)
+			if(tiles[i] == *c && *c!='x')
 				k = 0;
 		if(k == 1)
 		{
@@ -268,15 +274,15 @@ void gather_input(char* c, int* x, int* y, int* points, char tiles[5], char boar
 		for(i = -1; i < 2; i++)
 			for(j = -1; j < 2; j++)
 			{
-				int n_x = *x + i;
-				int n_y = *y + j;
-				
-				if(n_x >= 0 && n_x < 5 && n_y >= 0 && n_y < 5)
-				{
-					if(board[n_x][n_y] != 'x')
-						k = 0;
-				}
-						
+                if(!((i==-1 && j==-1) || (i==1 && j==1) || (i==1 && j==-1) || (i==-1 && j==1)) ) {
+                    int n_x = *x + i;
+                    int n_y = *y + j;
+
+                    if (n_x >= 0 && n_x < 5 && n_y >= 0 && n_y < 5) {
+                        if (board[n_x][n_y] != 'x')
+                            k = 0;
+                    }
+                }
 			}
 		/* Check if tile overlaps other one. */	
 		if(board[*x][*y] != 'x')

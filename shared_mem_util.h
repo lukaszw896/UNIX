@@ -10,7 +10,7 @@
 /*
  * Basically wraps shmget() to provide error check.
  */
-void shared_mem_init(int*,int, char);
+void shared_mem_init(int*,int);
 
 /*
  * Error checking for shmat().

@@ -17,7 +17,6 @@ typedef struct
 	int didGameEnd;
 } game;
 
-void scrabble_game_init(int*, game*);
 void scrabble_game_blank(game*);
 void scrabble_game_print_board(char[5][5]);
 void scrabble_game_print_title();
@@ -29,7 +28,5 @@ void scrabble_game_print_points(int, int, int);
 int scrabble_game_calculate_points(char[5][5], int, int);
 int scrabble_game_calculate_vertical(char[5][5], int, int);
 int scrabble_game_calculate_horizontal(char[5][5], int, int);
-int scrabble_game_calculate_descending(char[5][5], int, int);
-int scrabble_game_calculate_ascending(char[5][5], int, int);
 
 #endif

@@ -20,7 +20,6 @@ void tcp_socket_init_unix(int *descriptor, struct sockaddr_in* soc, char* name)
     }
 
     soc->sin_family = AF_INET;
-    //strcpy(soc->sun_path, name);
     soc->sin_port = htons(2000);
 	soc->sin_addr.s_addr = htonl(INADDR_ANY);
 
@@ -87,44 +86,42 @@ int tcp_socket_read_packet(int socket, packet* pac)
         return t;
 }
 
-
-///// HTON
-
 void tcp_socket_serialize(packet pac, char* str)
 {
-	sprintf(str, 
-	"%d%c%c%c%d%c%d%c%d%c%d%c%d%c%d%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
-	
-	pac.msg, SEPARATOR, pac.letter, SEPARATOR, pac.x_coord, SEPARATOR, pac.y_coord, 
-	SEPARATOR, pac.p1Points, SEPARATOR, pac.p2Points, SEPARATOR, pac.playerType,SEPARATOR, pac.isMatchOngoing,
-	
-	SEPARATOR, pac.currentBoard[0][0], SEPARATOR, pac.currentBoard[0][1], SEPARATOR, pac.currentBoard[0][2], SEPARATOR, pac.currentBoard[0][3], SEPARATOR, pac.currentBoard[0][4], 
-	SEPARATOR, pac.currentBoard[1][0], SEPARATOR, pac.currentBoard[1][1], SEPARATOR, pac.currentBoard[1][2], SEPARATOR, pac.currentBoard[1][3], SEPARATOR, pac.currentBoard[1][4], 
-	SEPARATOR, pac.currentBoard[2][0], SEPARATOR, pac.currentBoard[2][1], SEPARATOR, pac.currentBoard[2][2], SEPARATOR, pac.currentBoard[2][3], SEPARATOR, pac.currentBoard[2][4], 
-	SEPARATOR, pac.currentBoard[3][0], SEPARATOR, pac.currentBoard[3][1], SEPARATOR, pac.currentBoard[3][2], SEPARATOR, pac.currentBoard[3][3], SEPARATOR, pac.currentBoard[3][4], 
-	SEPARATOR, pac.currentBoard[4][0], SEPARATOR, pac.currentBoard[4][1], SEPARATOR, pac.currentBoard[4][2], SEPARATOR, pac.currentBoard[4][3], SEPARATOR, pac.currentBoard[4][4],
-	
-	SEPARATOR, pac.tiles[0], SEPARATOR, pac.tiles[1], SEPARATOR, pac.tiles[2], SEPARATOR, pac.tiles[3], SEPARATOR, pac.tiles[4]
+	sprintf(str,
+			"%d%c%c%c%d%c%d%c%d%c%d%c%d%c%d%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
+
+			pac.msg, SEPARATOR, pac.letter, SEPARATOR, pac.x_coord, SEPARATOR, pac.y_coord,
+			SEPARATOR, pac.p1Points, SEPARATOR, pac.p2Points, SEPARATOR, pac.playerType,SEPARATOR, pac.isMatchOngoing,
+
+			SEPARATOR, pac.currentBoard[0][0], SEPARATOR, pac.currentBoard[0][1], SEPARATOR, pac.currentBoard[0][2], SEPARATOR, pac.currentBoard[0][3], SEPARATOR, pac.currentBoard[0][4],
+			SEPARATOR, pac.currentBoard[1][0], SEPARATOR, pac.currentBoard[1][1], SEPARATOR, pac.currentBoard[1][2], SEPARATOR, pac.currentBoard[1][3], SEPARATOR, pac.currentBoard[1][4],
+			SEPARATOR, pac.currentBoard[2][0], SEPARATOR, pac.currentBoard[2][1], SEPARATOR, pac.currentBoard[2][2], SEPARATOR, pac.currentBoard[2][3], SEPARATOR, pac.currentBoard[2][4],
+			SEPARATOR, pac.currentBoard[3][0], SEPARATOR, pac.currentBoard[3][1], SEPARATOR, pac.currentBoard[3][2], SEPARATOR, pac.currentBoard[3][3], SEPARATOR, pac.currentBoard[3][4],
+			SEPARATOR, pac.currentBoard[4][0], SEPARATOR, pac.currentBoard[4][1], SEPARATOR, pac.currentBoard[4][2], SEPARATOR, pac.currentBoard[4][3], SEPARATOR, pac.currentBoard[4][4],
+
+			SEPARATOR, pac.tiles[0], SEPARATOR, pac.tiles[1], SEPARATOR, pac.tiles[2], SEPARATOR, pac.tiles[3], SEPARATOR, pac.tiles[4]
 
 	);
-} 
+}
 
 void tcp_socket_deserialize(packet* pac, char* str)
 {	char tmp;
-	sscanf(str, 
-	"%d%c%c%c%d%c%d%c%d%c%d%c%d%c%d%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
-	
-	&(pac->msg), &tmp, &(pac->letter), &tmp, &(pac->x_coord), &tmp, &(pac->y_coord),
-		&tmp, &(pac->p1Points), &tmp, &(pac->p2Points), &tmp, &(pac->playerType),&tmp,&(pac->isMatchOngoing),
-		 
-	&tmp, &(pac->currentBoard[0][0]), &tmp, &(pac->currentBoard[0][1]), &tmp, &(pac->currentBoard[0][2]), &tmp, &(pac->currentBoard[0][3]), &tmp, &(pac->currentBoard[0][4]), 
-	&tmp, &(pac->currentBoard[1][0]), &tmp, &(pac->currentBoard[1][1]), &tmp, &(pac->currentBoard[1][2]), &tmp, &(pac->currentBoard[1][3]), &tmp, &(pac->currentBoard[1][4]), 
-	&tmp, &(pac->currentBoard[2][0]), &tmp, &(pac->currentBoard[2][1]), &tmp, &(pac->currentBoard[2][2]), &tmp, &(pac->currentBoard[2][3]), &tmp, &(pac->currentBoard[2][4]), 
-	&tmp, &(pac->currentBoard[3][0]), &tmp, &(pac->currentBoard[3][1]), &tmp, &(pac->currentBoard[3][2]), &tmp, &(pac->currentBoard[3][3]), &tmp, &(pac->currentBoard[3][4]), 
-	&tmp, &(pac->currentBoard[4][0]), &tmp, &(pac->currentBoard[4][1]), &tmp, &(pac->currentBoard[4][2]), &tmp, &(pac->currentBoard[4][3]), &tmp, &(pac->currentBoard[4][4]),
-	
-	&tmp, &(pac->tiles[0]), &tmp, &(pac->tiles[1]), &tmp, &(pac->tiles[2]), &tmp, &(pac->tiles[3]), &tmp, &(pac->tiles[4])
-	
+	sscanf(str,
+		   "%d%c%c%c%d%c%d%c%d%c%d%c%d%c%d%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c",
 
-	 );
-} 
+		   &(pac->msg), &tmp, &(pac->letter), &tmp, &(pac->x_coord), &tmp, &(pac->y_coord),
+		   &tmp, &(pac->p1Points), &tmp, &(pac->p2Points), &tmp, &(pac->playerType),&tmp,&(pac->isMatchOngoing),
+
+		   &tmp, &(pac->currentBoard[0][0]), &tmp, &(pac->currentBoard[0][1]), &tmp, &(pac->currentBoard[0][2]), &tmp, &(pac->currentBoard[0][3]), &tmp, &(pac->currentBoard[0][4]),
+		   &tmp, &(pac->currentBoard[1][0]), &tmp, &(pac->currentBoard[1][1]), &tmp, &(pac->currentBoard[1][2]), &tmp, &(pac->currentBoard[1][3]), &tmp, &(pac->currentBoard[1][4]),
+		   &tmp, &(pac->currentBoard[2][0]), &tmp, &(pac->currentBoard[2][1]), &tmp, &(pac->currentBoard[2][2]), &tmp, &(pac->currentBoard[2][3]), &tmp, &(pac->currentBoard[2][4]),
+		   &tmp, &(pac->currentBoard[3][0]), &tmp, &(pac->currentBoard[3][1]), &tmp, &(pac->currentBoard[3][2]), &tmp, &(pac->currentBoard[3][3]), &tmp, &(pac->currentBoard[3][4]),
+		   &tmp, &(pac->currentBoard[4][0]), &tmp, &(pac->currentBoard[4][1]), &tmp, &(pac->currentBoard[4][2]), &tmp, &(pac->currentBoard[4][3]), &tmp, &(pac->currentBoard[4][4]),
+
+		   &tmp, &(pac->tiles[0]), &tmp, &(pac->tiles[1]), &tmp, &(pac->tiles[2]), &tmp, &(pac->tiles[3]), &tmp, &(pac->tiles[4])
+
+
+	);
+}
+

@@ -27,7 +27,7 @@ int main(void)
     struct sockaddr_in local, remote;
 
 	/* Waiting player socket in shared memory */
-	shared_mem_init(&waitingPlayerSocketId,sizeof(int),'E');
+	shared_mem_init(&waitingPlayerSocketId,sizeof(int));
 	waitingPlayerSocketAddress = (PlayerInfo*)shared_mem_attach(waitingPlayerSocketId);
 	waitingPlayerSocketAddress->status = NO_PLAYER;
 	
@@ -99,6 +99,9 @@ int main(void)
 void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer,struct sockaddr_in clientAddress) {
 
     packet* msg = malloc(sizeof (packet));
+    if(msg == NULL){
+        ERR("malloc");
+    }
     game* scrabbleGameAddress = NULL;
     FILE* fd = NULL;
     char playerTiles[5] = {'x', 'x', 'x', 'x', 'x'};
@@ -121,6 +124,9 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
     while (g_doWork) {
         msg = malloc(sizeof (packet));
+        if(msg == NULL){
+            ERR("malloc");
+        }
         msg->isMatchOngoing = 1;
         scrabbleGameAddress = NULL;
         //playerTiles = {'x', 'x', 'x', 'x', 'x'};
@@ -159,7 +165,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             /* Create game  in shared memory for future play */
 
 
-            shared_mem_init(&scrabbleGameId, sizeof (game), 'G');
+            shared_mem_init(&scrabbleGameId, sizeof (game));
             scrabbleGameAddress = (game*) shared_mem_attach(scrabbleGameId);
             game newGame;
             newGame.status = DISCONNECTED;
@@ -543,7 +549,6 @@ void cleanUp(packet* msg,game* scrabbleGameAddress,int scrabbleGameId,int gameSe
 
 void sigint_handler(int sig) {
 	g_doWork = 0;
-    printf("SIGINT\n");
     g_flag = SIGINT;
 }
 
