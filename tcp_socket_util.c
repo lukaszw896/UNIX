@@ -1,5 +1,17 @@
 #include "tcp_socket_util.h"
 
+int tcp_wait_for_client(int *clientSocket, int serverSocket, struct sockaddr_in *remote)
+{
+	socklen_t sockLength = sizeof(remote);
+	if ((*clientSocket = accept(serverSocket, (struct sockaddr *)remote, &sockLength)) == -1)
+	{
+		if(errno == EINTR) {
+			return -1;
+		}
+	}
+	return 0;
+}
+
 void tcp_socket_init_unix(int *descriptor, struct sockaddr_in* soc, char* name)
 {
 	if ((*descriptor = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
@@ -29,10 +41,6 @@ void tcp_socket_bind(int* descriptor, struct sockaddr_in* soc)
 
 void tcp_socket_connect(int* descriptor, struct sockaddr_in* soc)
 {
-	//int len;
-		
-	//len = strlen(soc->sun_path) + sizeof(soc->sin_family);
-	
 	printf("Trying to connect...\n");
     if (connect(*descriptor, (struct sockaddr *)soc, sizeof(*soc)) == -1) {
         perror("connect");

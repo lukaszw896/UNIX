@@ -26,6 +26,9 @@
  */
 volatile sig_atomic_t g_doWork = 1;
 
+volatile sig_atomic_t g_flag = 0;
+
+
 /*       Host to network / network to host      */
 /*
  * For children's pids.
@@ -57,16 +60,6 @@ void sigint_handler(int sig);
 void sigterm_handler(int);
 
 void sigchld_handler(int);
-
-/*
- * In case of server's death, all subprocesses must be killed.
- */
-void terminate_children();
-
-/*
- * Store child's pid in children[].
- */
-void save_children_pid(int);
 
 /*
  * Function which is a response to MOVE_DATA client message

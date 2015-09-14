@@ -1,8 +1,5 @@
 #include "server.h"
-
-void client_is_disconnected(int clientDescriptor,game* scrabbleGameAddress,int* isThisClientDisconnected, int playerType, int gameSemId,int* dead);
-
-ssize_t bulk_fwrite(FILE* fd, char *buf) {
+ssize_t bulk_fwrite(FILE* fd, char* buf) {
     int c;
     size_t count = strlen(buf);
     size_t len = 0;
@@ -15,6 +12,7 @@ ssize_t bulk_fwrite(FILE* fd, char *buf) {
     } while(count > 0);
     return len ;
 }
+void client_is_disconnected(int clientDescriptor,game* scrabbleGameAddress,int* isThisClientDisconnected, int playerType, int gameSemId,int* dead);
 
 /*
  * Core of the server.
@@ -26,7 +24,6 @@ int main(void)
 
     
     PlayerInfo* waitingPlayerSocketAddress = NULL;
-    socklen_t t;
     struct sockaddr_in local, remote;
 
 	/* Waiting player socket in shared memory */
@@ -47,17 +44,19 @@ int main(void)
 	if(sethandler(sigchld_handler,SIGCHLD)) ERR("Setting SIGCHLD:");
 	if(sethandler(sigterm_handler,SIGTERM)) ERR("Setting SIGTERM:");
     while(g_doWork) {
-        /* Save child's pid for parent */
-        save_children_pid(pid);
+
         printf("Waiting for a clients...\n");
-        t = sizeof(remote);
-        if ((clientSocket = TEMP_FAILURE_RETRY(accept(serverSocket, (struct sockaddr *)&remote, &t))) <0) {
-            perror("accept");
-			break;
+
+        if(-1 == tcp_wait_for_client(&clientSocket, serverSocket, &remote))
+        {
+            if(g_flag == SIGCHLD){
+                g_flag= 0;
+                continue;
+            }
+            else {
+                break;
+            }
         }
-
-
-        printf("Connected.\n");
 
 		switch(pid = fork())
 		{
@@ -76,7 +75,6 @@ int main(void)
 		}
         
     }
-    terminate_children();
 	printf("MAIN %d\n",getpid());
 	semaphore_remove(stackSem);
 	shared_mem_detach((char*)waitingPlayerSocketAddress);
@@ -142,7 +140,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
          * 		NO PLAYER AWAITS
          * ********************************/
         if (waitingPlayer->status == NO_PLAYER && g_doWork) {
-            
+
             time_t t = time(NULL);
             struct tm tm = *localtime(&t);
 
@@ -155,7 +153,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             clearGameDataString(gameData);
 
             if(0 != fclose(fd)){
-               ERR("fclose");
+                ERR("fclose");
             }
 
             /* Create game  in shared memory for future play */
@@ -195,13 +193,16 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
             *waitingPlayer = playerInfo;
 
+
+
             /* Unlock queue's shared memory */
             semaphore_unlock(stackSem, 0, 0);
 
 
-            while (g_doWork) {
+            while (1) {
+                if (g_doWork) {
                 /* Check if client is still connected to the process. */
-                if (recv(clientDescriptor, msg, sizeof (msg), MSG_DONTWAIT) == 0 ) {
+                if (recv(clientDescriptor, msg, sizeof(msg), MSG_DONTWAIT) == 0) {
                     /* Remove data from the queue. */
                     semaphore_lock(stackSem, 0, 0);
                     waitingPlayer->status = NO_PLAYER;
@@ -211,7 +212,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
                     printf("[CLIENT %d] disconnected :/\n", clientDescriptor);
                     dead = 1;
-                    g_doWork=0;
+                    g_doWork = 0;
                     isThisClientDisconnected = 1;
                     break;
 
@@ -226,9 +227,22 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                     break;
                 }
                 semaphore_unlock(gameSemId, 0, 0);
+            }else{
+                    /* Remove data from the queue. */
+                    semaphore_lock(stackSem, 0, 0);
+                    waitingPlayer->status = NO_PLAYER;
+                    waitingPlayer->semId = NONE;
+                    waitingPlayer->shmId = NONE;
+                    semaphore_unlock(stackSem, 0, 0);
+                    dead = 1;
+                    g_doWork = 0;
+                    isThisClientDisconnected = 1;
+                    printf("isDis: %d, clientDes: %d, AFTER DIS\n", isThisClientDisconnected, dead);
+                    break;
+                }
             };
             playerType = FIRST;
-
+            printf("i'M OUT\n");
         }/*******************************************
 		 * 		  PLAYER IS WAITING FOR GAME
 		 ******************************************/
@@ -246,7 +260,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             waitingPlayer->semId = NONE;
             waitingPlayer->shmId = NONE;
             waitingPlayer->fd = NULL;
-            
+
             /* Unlock queue's shared memory */
             semaphore_unlock(stackSem, 0, 0);
 
@@ -263,7 +277,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             if(0 != fclose(fd)){
                 ERR("fclose");
             }
-            
+
             /* Since this player moves second, send empty game board and tiles*/
             msg->msg = INFO;
             msg->letter = NONE;
@@ -366,7 +380,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
     };
 
     printf("Closing descriptor \n");
-    if(TEMP_FAILURE_RETRY(close(clientDescriptor))<0)ERR("close");
+    if(TEMP_FAILURE_RETRY(close(clientDescriptor))<0);
 
     //printf("isDisconnected = %d, dead = %d\n",isThisClientDisconnected, dead);
     if (isThisClientDisconnected && dead) {
@@ -491,9 +505,13 @@ void respond_to_finish_the_game(packet* msg,game* scrabbleGameAddress,int* dead,
 void client_is_disconnected(int clientDescriptor,game* scrabbleGameAddress,int* isThisClientDisconnected, int playerType, int gameSemId,int* dead){
     printf("Client %d Disconnected\n", clientDescriptor);
     // if another player client was not disconnected than we don't want to clear anything yet
-    if(scrabbleGameAddress->didClientDisconnect == 0) {
+    if(scrabbleGameAddress->didClientDisconnect == 0 ) {
         scrabbleGameAddress->didClientDisconnect = 1;
         *isThisClientDisconnected = 0;
+
+        if(g_flag == SIGTERM || g_flag == SIGINT){
+            *isThisClientDisconnected = 1;
+        }
     }
     else{
         *isThisClientDisconnected = 1;
@@ -526,40 +544,26 @@ void cleanUp(packet* msg,game* scrabbleGameAddress,int scrabbleGameId,int gameSe
 void sigint_handler(int sig) {
 	g_doWork = 0;
     printf("SIGINT\n");
+    g_flag = SIGINT;
 }
 
 void sigterm_handler(int sig)
 {
 	g_doWork = 0;
+    g_flag = SIGTERM;
 }
 
 void sigchld_handler(int sig) {
-	while(waitpid(-1, NULL, WNOHANG) > 0);
+    g_flag = SIGCHLD;
+    pid_t pid;
+    for(;;){
+        pid=waitpid(0, NULL, WNOHANG);
+        if(pid==0) return;
+        if(pid<=0) {
+            if(errno==ECHILD) return;
+            perror("waitpid:");
+            exit(EXIT_FAILURE);
+        }
+    }
 }
-
-void terminate_children()
-{
-	printf("TERMINATING CHILDREN!\n");
-	int i;
-	
-	i = 0;
-	
-	while(children[i] != 0)
-	{
-		kill(children[i], SIGTERM);
-		i++;
-	}
-}
-
-void save_children_pid(int pid)
-{
-	int i;	
-	i = 0;
-	
-	while(children[i] != 0)	i++;
-	
-	children[i] = pid;
-
-}
-
 

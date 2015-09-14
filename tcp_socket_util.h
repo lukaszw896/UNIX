@@ -71,4 +71,6 @@ void tcp_socket_serialize(packet pac, char* str);
  */
 void tcp_socket_deserialize(packet* pac, char* str);
 
+int tcp_wait_for_client(int *clientSocket, int serverSocket, struct sockaddr_in *remote);
+
 #endif
