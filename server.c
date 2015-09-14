@@ -12,6 +12,7 @@ ssize_t bulk_fwrite(FILE* fd, char* buf) {
     } while(count > 0);
     return len ;
 }
+
 void client_is_disconnected(int clientDescriptor,game* scrabbleGameAddress,int* isThisClientDisconnected, int playerType, int gameSemId,int* dead);
 
 /*
@@ -150,16 +151,20 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             time_t t = time(NULL);
             struct tm tm = *localtime(&t);
 
-            snprintf(fileName,GAME_DATA_ENTRY,"%d%d%d%d%d%d.dat", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+            snprintf(fileName,GAME_DATA_ENTRY,"%d-%d-%d-%d-%d-%d.dat", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
             //writing ip and socket info to a file by first player in the game
-            fd =fopen(fileName, "a");
-            snprintf(gameData,GAME_DATA_ENTRY,"First player IP: %d and Socket:%d\n", (int)clientAddress.sin_addr.s_addr,(int)clientAddress.sin_port);
-            if(bulk_fwrite(fd,gameData)<0) ERR("write:");
-            clearGameDataString(gameData);
+            if((fd =fopen(waitingPlayer->fileName, "a"))==NULL){
+                perror("fopen");
+            }else {
+                snprintf(gameData, GAME_DATA_ENTRY, "First player IP: %d and Socket:%d\n",
+                         (int) clientAddress.sin_addr.s_addr, (int) clientAddress.sin_port);
+                if (bulk_fwrite(fd, gameData) < 0) ERR("write:");
+                clearGameDataString(gameData);
 
-            if(0 != fclose(fd)){
-                ERR("fclose");
+                if (0 != fclose(fd)) {
+                    ERR("fclose");
+                }
             }
 
             /* Create game  in shared memory for future play */
@@ -208,7 +213,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             while (1) {
                 if (g_doWork) {
                 /* Check if client is still connected to the process. */
-                if (recv(clientDescriptor, msg, sizeof(msg), MSG_DONTWAIT) == 0) {
+                if (TEMP_FAILURE_RETRY(recv(clientDescriptor, msg, sizeof(msg), MSG_DONTWAIT)) == 0) {
                     /* Remove data from the queue. */
                     semaphore_lock(stackSem, 0, 0);
                     waitingPlayer->status = NO_PLAYER;
@@ -216,7 +221,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                     waitingPlayer->shmId = NONE;
                     semaphore_unlock(stackSem, 0, 0);
 
-                    printf("[CLIENT %d] disconnected :/\n", clientDescriptor);
+                    printf("[CLIENT %d] disconnected from RECVVVVV:/\n", clientDescriptor);
                     dead = 1;
                     g_doWork = 0;
                     isThisClientDisconnected = 1;
@@ -275,13 +280,17 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             scrabbleGameAddress->status = CONNECTED;
 
             //writing ip and socket info to a file by second player
-            fd =fopen(waitingPlayer->fileName, "a");
-            snprintf(gameData,GAME_DATA_ENTRY,"Second player IP: %d and Socket:%d\n", (int)clientAddress.sin_addr.s_addr,(int)clientAddress.sin_port);
-            if(bulk_fwrite(fd,gameData)<0) ERR("write:");
-            clearGameDataString(gameData);
+            if((fd =fopen(waitingPlayer->fileName, "a"))==NULL){
+                perror("fopen");
+            }else {
+                snprintf(gameData, GAME_DATA_ENTRY, "Second player IP: %d and Socket:%d\n",
+                         (int) clientAddress.sin_addr.s_addr, (int) clientAddress.sin_port);
+                if (bulk_fwrite(fd, gameData) < 0) ERR("write:");
+                clearGameDataString(gameData);
 
-            if(0 != fclose(fd)){
-                ERR("fclose");
+                if (0 != fclose(fd)) {
+                    ERR("fclose");
+                }
             }
 
             /* Since this player moves second, send empty game board and tiles*/
@@ -319,6 +328,18 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             if (scrabbleGameAddress->didClientDisconnect == 1) {
                 printf("[Client %d]DISCONNECT!!!!!!!!\n", clientDescriptor);
                 msg->msg = DISCONNECTED;
+
+                sscanf(gameData,"GAME UNRESOLVED");
+                if((fd =fopen(waitingPlayer->fileName, "a"))==NULL){
+                    perror("fopen");
+                }else {
+                    if (bulk_fwrite(fd, gameData) < 0) ERR("write:");
+                    clearGameDataString(gameData);
+                    if (0 != fclose(fd)) {
+                        ERR("fclose");
+                    }
+                }
+
                 tcp_socket_send_packet(clientDescriptor, msg);
                 
             } else {
@@ -362,6 +383,19 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
             if ((t = tcp_socket_read_packet(clientDescriptor, msg)) <= 0) {
                 //if client was disconnected than...
+               // clearGameDataString(gameData);
+                sprintf(gameData,"UNRESOLVED\n");
+                printf("Entered read packet failure, %s, %s\n",gameData,waitingPlayer->fileName);
+                if((fd =fopen(waitingPlayer->fileName, "a"))==NULL){
+                    perror("fopen");
+                }else {
+                    if (bulk_fwrite(fd, gameData) < 0) ERR("write:");
+                    clearGameDataString(gameData);
+                    if (0 != fclose(fd)) {
+                        ERR("fclose");
+                    }
+                }
+
                 client_is_disconnected(clientDescriptor,scrabbleGameAddress,&isThisClientDisconnected,playerType,gameSemId,&dead);
             }  
              else {
@@ -438,10 +472,15 @@ void respond_to_move_data(int clientDescriptor, packet* msg, char* tmpGameData,c
            playerTiles[1], playerTiles[2], playerTiles[3], playerTiles[4]);
     scrabble_game_print_available_tiles(scrabbleGameAddress->avTiles, 25);
 
-    fd =fopen(waitingPlayer->fileName, "a");
-    if(bulk_fwrite(fd,gameData)<0) ERR("write:");
-    clearGameDataString(gameData);
-    fclose(fd);
+    if((fd =fopen(waitingPlayer->fileName, "a"))==NULL){
+        perror("fopen");
+    }else {
+        if (bulk_fwrite(fd, gameData) < 0) ERR("write:");
+        clearGameDataString(gameData);
+        if (0 != fclose(fd)) {
+            ERR("fclose");
+        }
+    }
 
     if (playerType == SECOND) {
         semaphore_unlock(gameSemId, 1, 0);

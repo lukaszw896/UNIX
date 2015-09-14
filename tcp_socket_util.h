@@ -1,6 +1,7 @@
 #ifndef TCP_SOCKET_UTIL_H
 #define TCP_SOCKET_UTIL_H
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>

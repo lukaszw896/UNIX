@@ -1,8 +1,8 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-
 #define _GNU_SOURCE
+
 /* System includes */
 #include <stdio.h>
 #include <stdlib.h>
