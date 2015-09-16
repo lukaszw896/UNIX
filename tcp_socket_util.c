@@ -24,7 +24,7 @@ struct sockaddr_in make_address(char *address, uint16_t port){
 	return addr;
 }
 
-int connect_socket(char *name, uint16_t port){
+int tcp_connect_socket(char *name, uint16_t port){
 	struct sockaddr_in addr;
 	int socketfd;
 	socketfd = make_socket();
@@ -81,16 +81,6 @@ void tcp_socket_bind(int* descriptor, struct sockaddr_in* soc)
 		 exit(1);
 	 }
 
-}
-
-void tcp_socket_connect(int* descriptor, struct sockaddr_in* soc)
-{
-	printf("Trying to connect...\n");
-    if (connect(*descriptor, (struct sockaddr *)soc, sizeof(*soc)) == -1) {
-        perror("connect");
-        exit(1);
-    }
-    printf("Connected.\n");
 }
 	
 void tcp_socket_listen(int* descriptor, int incomingConn)

@@ -48,13 +48,13 @@ typedef struct
  * Each client after accepting, gets his own process and permorms this function.
  */
 void handle_client(int, int, PlayerInfo*,struct sockaddr_in);
+/*
+ * Cleans up game memory
+ */
 void cleanUp(packet*,game*,int,int);
+
 void clearGameDataString(char*);
 
-
-/*
- * When server process has been interrupted shared memory must be realesed.
- */
 void sigint_handler(int sig);
 
 void sigterm_handler(int);
@@ -73,5 +73,15 @@ void respond_to_play_another_game(packet* msg,game* scrabbleGameAddress,int* dea
  * Function which is a response to FINISH_GAME client message
  */
 void respond_to_finish_the_game(packet* msg,game* scrabbleGameAddress,int* dead,int playerType,int gameSemId,int* cleanUpMemoryBool, int scrabbleGameId);
+/*
+ * Function which do stuff after client is disconnected
+ */
+void client_is_disconnected(int clientDescriptor,game* scrabbleGameAddress,int* isThisClientDisconnected, int playerType, int gameSemId,int* dead);
+
+ssize_t bulk_fwrite(FILE* fd, char* buf);
+/*
+ * open file "fd" with name "fileName" and write "gameData" string to it.
+ */
+void write_to_file(FILE* fd,char* fileName, char* gameData);
 
 #endif

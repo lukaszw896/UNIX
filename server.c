@@ -1,32 +1,5 @@
 #include "server.h"
 
-
-ssize_t bulk_fwrite(FILE* fd, char* buf) {
-    int c;
-    size_t count = strlen(buf);
-    size_t len = 0;
-    do {
-        c = TEMP_FAILURE_RETRY(fwrite(buf, sizeof(char), strlen(buf), fd));
-        if (c < 0) return c;
-        buf += c;
-        len += c;
-        count -= c;
-    } while(count > 0);
-    return len ;
-}
-
-void write_to_file(FILE* fd,char* fileName, char* gameData){
-    if((fd =fopen(fileName, "a"))==NULL){
-        perror("fopen");
-    }else {
-        if (bulk_fwrite(fd, gameData) < 0) ERR("write:");
-        clearGameDataString(gameData);
-        if (0 != fclose(fd)) {
-            ERR("fclose");
-        }
-    }
-}
-
 void client_is_disconnected(int clientDescriptor,game* scrabbleGameAddress,int* isThisClientDisconnected, int playerType, int gameSemId,int* dead);
 
 int main(void)
@@ -87,7 +60,6 @@ int main(void)
         
     }
     while(TEMP_FAILURE_RETRY(wait(NULL)) > 0);
-	printf("MAIN %d\n",getpid());
 	semaphore_remove(stackSem);
 	shared_mem_detach((char*)waitingPlayerSocketAddress);
 	shared_mem_delete(waitingPlayerSocketId);
@@ -128,7 +100,6 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
         }
         msg->isMatchOngoing = 1;
         scrabbleGameAddress = NULL;
-        //playerTiles = {'x', 'x', 'x', 'x', 'x'};
         playerTiles[0] = 'x';
         playerTiles[1] = 'x';
         playerTiles[2] = 'x';
@@ -171,7 +142,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
             scrabble_game_blank(scrabbleGameAddress);
             printf("Game has been initialized.\n");
-            scrabble_game_print_available_tiles(scrabbleGameAddress->avTiles, 25);
+
 
             /* Create semaphore to control shared memory */
             semaphore_init(&gameSemId, getpid(), 3);
@@ -418,7 +389,6 @@ void respond_to_move_data(int clientDescriptor, packet* msg, char* tmpGameData,c
         }
     printf("[Client %d] Tiles_current:  %c %c %c %c %c\n", clientDescriptor, playerTiles[0],
            playerTiles[1], playerTiles[2], playerTiles[3], playerTiles[4]);
-    scrabble_game_print_available_tiles(scrabbleGameAddress->avTiles, 25);
 
     write_to_file(fd,fileName,gameData);
 
@@ -547,6 +517,32 @@ void sigchld_handler(int sig) {
             if(errno==ECHILD) return;
             perror("waitpid:");
             exit(EXIT_FAILURE);
+        }
+    }
+}
+
+ssize_t bulk_fwrite(FILE* fd, char* buf) {
+    int c;
+    size_t count = strlen(buf);
+    size_t len = 0;
+    do {
+        c = TEMP_FAILURE_RETRY(fwrite(buf, sizeof(char), strlen(buf), fd));
+        if (c < 0) return c;
+        buf += c;
+        len += c;
+        count -= c;
+    } while(count > 0);
+    return len ;
+}
+
+void write_to_file(FILE* fd,char* fileName, char* gameData){
+    if((fd =fopen(fileName, "a"))==NULL){
+        perror("fopen");
+    }else {
+        if (bulk_fwrite(fd, gameData) < 0) ERR("write:");
+        clearGameDataString(gameData);
+        if (0 != fclose(fd)) {
+            ERR("fclose");
         }
     }
 }

@@ -32,7 +32,7 @@
 #define MOVE_DATA			-9
 #define INFO				-10
 #define EXIT				-11
-#define PLAY_ANOTHER_GAME               -12
-#define FINISH_GAME                     -13
+#define PLAY_ANOTHER_GAME   -12
+#define FINISH_GAME         -13
 
 #endif

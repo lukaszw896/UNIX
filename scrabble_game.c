@@ -46,7 +46,7 @@ void scrabble_game_attach_tiles(char tiles[25])
 void scrabble_game_print_available_tiles(char tiles[], int n)
 {
 	int i;
-	for(i = 0; i < n; i++) 
+	for(i = 0; i < n; i++)
 	{
 		if(tiles[i] != UNAVAILABLE)
 			printf("%c ", tiles[i]);
@@ -98,7 +98,7 @@ void scrabble_game_print_points(int p1, int p2, int type)
 			printf("#  You:      %d\n# Opponent: %d\n", p1, p2);
 			break;
 		case SECOND:
-			printf("#  You:      %d\n# Opponent: %d #\n", p2, p1);
+			printf("#  You:      %d\n# Opponent: %d\n", p2, p1);
 			break;
 	}
 	printf("------------------------------------------\n");

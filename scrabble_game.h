@@ -17,6 +17,7 @@ typedef struct
 	int didGameEnd;
 } game;
 
+//fill board with empty spaces
 void scrabble_game_blank(game*);
 void scrabble_game_print_board(char[5][5]);
 void scrabble_game_print_title();

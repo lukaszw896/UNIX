@@ -19,15 +19,11 @@
 #include "tcp_socket_util.h"
 #include "settings.h"
 
-/*
- * When SIGINT or SIGTERM is catched, this variable will tell main loop to stop.
- */
 volatile sig_atomic_t g_doWork = 1;
 
 int gather_input(char*, int*, int*,int*, char[5], char[5][5]);
-void otherPlayerDisconnected(packet* msg,int s);
-void sigint_handler(int sig);
 
+void sigint_handler(int sig);
 void sigterm_handler(int sig);
 
 int main(void) {
@@ -48,11 +44,10 @@ int main(void) {
     
     /* Set signals handlers */
 	if(sethandler(sigint_handler,SIGINT)) ERR("Setting SIGINT:");
-	//if(sethandler(sigchld_handler,SIGCHLD)) ERR("Setting SIGCHLD:");
 	if(sethandler(sigterm_handler,SIGTERM)) ERR("Setting SIGTERM:");
 
     /*********  TCP IP  *********/
-    s = connect_socket("localhost", 2000);
+    s = tcp_connect_socket("localhost", 2000);
 
     printf("##############################\n");
     printf("## WELCOME TO SCRABBLE GAME ##\n");
@@ -145,7 +140,6 @@ int main(void) {
                         printf("isMatchOngoing = %d \n", tmp->isMatchOngoing);
                         tcp_socket_send_packet(s, tmp);
                         return EXIT_SUCCESS;
-                        break;
                     }
                 }
                 break;
@@ -167,14 +161,12 @@ int main(void) {
                     tmp->msg = FINISH_GAME;
                     tcp_socket_send_packet(s, tmp);
                     return EXIT_SUCCESS;
-                break;
                 }
                 break;
                 
             case EXIT:
                 printf("Server disconnected.\n");
                 return EXIT_SUCCESS;
-                break;
             default:
                 printf("Cannot interpret packet's message: %d \n", rec->msg);
         }
@@ -202,7 +194,6 @@ int gather_input(char* c, int* x, int* y, int* points, char tiles[5], char board
                printf("Input error\n");
             }
         }
-
 
 		/* Basic border check */
 		if(*x < 0 || *y < 0 || *x > 4 || *y > 4)
@@ -235,7 +226,6 @@ int gather_input(char* c, int* x, int* y, int* points, char tiles[5], char board
 			break;
 		}
 		
-		
 		/* Check if movement is possible */
 		k = 1;
 		for(i = -1; i < 2; i++)
@@ -260,7 +250,6 @@ int gather_input(char* c, int* x, int* y, int* points, char tiles[5], char board
 			continue;
 		}
 
-
 		/* At this point everything (for sure) is ok. */
 		break;
 	}
@@ -271,7 +260,6 @@ int gather_input(char* c, int* x, int* y, int* points, char tiles[5], char board
 
 void sigint_handler(int sig) {
 	g_doWork = 0;
-        printf("sigint handler");
 }
 
 void sigterm_handler(int sig)
