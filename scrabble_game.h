@@ -14,7 +14,6 @@ typedef struct
 	int p1Points;
 	int p2Points;
 	int didClientDisconnect;
-	int didGameEnd;
 } game;
 
 //fill board with empty spaces

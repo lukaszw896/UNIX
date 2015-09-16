@@ -108,9 +108,6 @@ int scrabble_game_calculate_points(char gb[5][5], int x, int y)
 {
 	int v_p, h_p,  max;
 	
-	v_p = 0;
-	h_p = 0;
-	
 	v_p = scrabble_game_calculate_vertical(gb, x ,y);
 	max = v_p;
 	

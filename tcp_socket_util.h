@@ -29,12 +29,6 @@ typedef struct
 	char tiles[5];
 } packet;
 
-int make_socket(void);
-
-struct sockaddr_in make_address(char *address, uint16_t port);
-
-int tcp_connect_socket(char *name, uint16_t port);
-
 /*
  * Creates basic socket of AF_UNIX family. 
  * Socket is indetified with its descriptor and special structure.
@@ -45,12 +39,6 @@ void tcp_socket_init_unix(int *descriptor, struct sockaddr_in* soc, char* name);
  * Binds given descriptor and socket structure.
  */
 void tcp_socket_bind(int*, struct sockaddr_in*);
-
-/*
- * Connects to a provided socket
- * Socket is indetify with its descriptor and special structure.
- */
-void tcp_socket_connect(int*, struct sockaddr_in*);
 
 /*
  * Forces socket to start listening for incoming connections.
@@ -79,5 +67,12 @@ void tcp_socket_serialize(packet pac, char* str);
 void tcp_socket_deserialize(packet* pac, char* str);
 
 int tcp_wait_for_client(int *clientSocket, int serverSocket, struct sockaddr_in *remote);
+
+int make_socket(void);
+
+struct sockaddr_in make_address(char *address, uint16_t port);
+
+int tcp_connect_socket(char *name, uint16_t port);
+
 
 #endif

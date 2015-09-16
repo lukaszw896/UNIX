@@ -21,19 +21,10 @@
 
 #define GAME_DATA_ENTRY 3000
 
-/*
- * When SIGINT is catched, this variable will tell main loop to stop.
- */
 volatile sig_atomic_t g_doWork = 1;
 
 volatile sig_atomic_t g_flag = 0;
 
-
-/*       Host to network / network to host      */
-/*
- * For children's pids.
- */
-volatile sig_atomic_t children[MAX_CHILDREN];
 
 typedef struct
 {
@@ -68,7 +59,7 @@ void respond_to_move_data(int clientDescriptor, packet* msg, char* tmpGameData,c
 /*
  * Function which is a response to PLAY_ANOTHER_GAME client message
  */
-void respond_to_play_another_game(packet* msg,game* scrabbleGameAddress,int* dead,int playerType,int gameSemId,int clientDescriptor, int* cleanUpMemoryBool, int scrabbleGameId);
+void respond_to_play_another_game(packet* msg,game* scrabbleGameAddress,int* dead,int playerType,int gameSemId, int* cleanUpMemoryBool, int scrabbleGameId);
 /*
  * Function which is a response to FINISH_GAME client message
  */

@@ -1,7 +1,5 @@
 #include "server.h"
 
-void client_is_disconnected(int clientDescriptor,game* scrabbleGameAddress,int* isThisClientDisconnected, int playerType, int gameSemId,int* dead);
-
 int main(void)
 {
 	
@@ -63,7 +61,7 @@ int main(void)
 	semaphore_remove(stackSem);
 	shared_mem_detach((char*)waitingPlayerSocketAddress);
 	shared_mem_delete(waitingPlayerSocketId);
-
+    printf("Server has been disconnected.\n");
     return EXIT_SUCCESS;
 }
 
@@ -88,7 +86,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
     int cleanUpMemoryBool;
 
     /* Control variable for connection lost. */
-    int dead = 0;
+    int dead;
     /* To discriminate player, which starts the game */
     int playerType;
     int u, v;
@@ -108,7 +106,6 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
         isThisClientDisconnected=0;
         cleanUpMemoryBool = 1;
         dead = 0;
-        printf("BEGGINING OF EVERYTHING\n");
         semaphore_lock(stackSem, 0, 0);
         printf("[CLIENT %d] in charge of queue's Shared memory %d\n", clientDescriptor, stackSem);
 
@@ -138,7 +135,6 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
             scrabbleGameAddress->p1Points = 0;
             scrabbleGameAddress->p2Points = 0;
             scrabbleGameAddress->didClientDisconnect = 0;
-            scrabbleGameAddress->didGameEnd = 0;
 
             scrabble_game_blank(scrabbleGameAddress);
             printf("Game has been initialized.\n");
@@ -206,10 +202,10 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
                 }
             };
             playerType = FIRST;
-        }/*******************************************
+        }
+         /*******************************************
 		 * 		  PLAYER IS WAITING FOR GAME
 		 ******************************************/
-
         else if (g_doWork) {
             // Retrieve semaphore's and shared memory's ids.
             gameSemId = waitingPlayer->semId;
@@ -260,7 +256,6 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
         /* Main game loop */
         while (1 && (!dead) && g_doWork) {
-            printf("BEGINNING OF GAME LOOP \n");
             if (playerType == FIRST) {
                 semaphore_lock(gameSemId, 1, 0);
             } else {
@@ -331,7 +326,7 @@ void handle_client(int clientDescriptor, int stackSem, PlayerInfo* waitingPlayer
 
                 } else if (msg->msg == PLAY_ANOTHER_GAME) {
 
-                    respond_to_play_another_game(msg,scrabbleGameAddress,&dead,playerType,gameSemId,clientDescriptor, &cleanUpMemoryBool, scrabbleGameId);
+                    respond_to_play_another_game(msg,scrabbleGameAddress,&dead,playerType,gameSemId, &cleanUpMemoryBool, scrabbleGameId);
 
                 } else if (msg->msg == FINISH_GAME) {
 
@@ -399,7 +394,7 @@ void respond_to_move_data(int clientDescriptor, packet* msg, char* tmpGameData,c
     }
 }
 
-void respond_to_play_another_game(packet* msg,game* scrabbleGameAddress,int* dead,int playerType,int gameSemId,int clientDescriptor, int* cleanUpMemoryBool, int scrabbleGameId){
+void respond_to_play_another_game(packet* msg,game* scrabbleGameAddress,int* dead,int playerType,int gameSemId, int* cleanUpMemoryBool, int scrabbleGameId){
     if(msg->isMatchOngoing == -1){
         scrabbleGameAddress->didClientDisconnect = 0;
         *dead = 1;

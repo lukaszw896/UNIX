@@ -117,7 +117,6 @@ int main(void) {
                         tmp->y_coord = y;
                         tmp->p1Points = rec->p1Points;
                         tmp->p2Points = rec->p2Points;
-                        printf("Right before sending packet: %d \n", tmp->isMatchOngoing);
                         tcp_socket_send_packet(s, tmp);
                         scrabble_game_print_wait_for_move();
                     }
