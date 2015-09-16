@@ -1,11 +1,56 @@
+#define _GNU_SOURCE
+
+#define HERR(source) (fprintf(stderr,"%s(%d) at %s:%d\n",source,h_errno,__FILE__,__LINE__),\
+		     exit(EXIT_FAILURE))
+
+#include <netdb.h>
 #include "tcp_socket_util.h"
+
+int make_socket(void){
+	int sock;
+	sock = socket(PF_INET,SOCK_STREAM,0);
+	if(sock < 0) ERR("socket");
+	return sock;
+}
+
+struct sockaddr_in make_address(char *address, uint16_t port){
+	struct sockaddr_in addr;
+	struct hostent *hostinfo;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons (port);
+	hostinfo = gethostbyname(address);
+	if(hostinfo == NULL)HERR("gethostbyname");
+	addr.sin_addr = *(struct in_addr*) hostinfo->h_addr;
+	return addr;
+}
+
+int connect_socket(char *name, uint16_t port){
+	struct sockaddr_in addr;
+	int socketfd;
+	socketfd = make_socket();
+	addr=make_address(name,port);
+	if(connect(socketfd,(struct sockaddr*) &addr,sizeof(struct sockaddr_in)) < 0){
+		if(errno!=EINTR) ERR("connect");
+		else {
+			fd_set wfds ;
+			int status;
+			socklen_t size = sizeof(int);
+			FD_ZERO(&wfds);
+			FD_SET(socketfd, &wfds);
+			if(TEMP_FAILURE_RETRY(select(socketfd+1,NULL,&wfds,NULL,NULL))<0) ERR("select");
+			if(getsockopt(socketfd,SOL_SOCKET,SO_ERROR,&status,&size)<0) ERR("getsockopt");
+			if(0!=status) ERR("connect");
+		}
+	}
+	return socketfd;
+}
 
 int tcp_wait_for_client(int *clientSocket, int serverSocket, struct sockaddr_in *remote)
 {
 	socklen_t sockLength = sizeof(remote);
 	if ((*clientSocket = accept(serverSocket, (struct sockaddr *)remote, &sockLength)) == -1)
 	{
-		if(errno == EINTR) {
+		if(errno == EINTR || errno == SIGTERM) {
 			return -1;
 		}
 	}

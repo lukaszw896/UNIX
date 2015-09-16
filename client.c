@@ -24,56 +24,11 @@
  */
 volatile sig_atomic_t g_doWork = 1;
 
-void gather_input(char*, int*, int*,int*, char[5], char[5][5]);
+int gather_input(char*, int*, int*,int*, char[5], char[5][5]);
 void otherPlayerDisconnected(packet* msg,int s);
 void sigint_handler(int sig);
 
 void sigterm_handler(int sig);
-
-#define HERR(source) (fprintf(stderr,"%s(%d) at %s:%d\n",source,h_errno,__FILE__,__LINE__),\
-		     exit(EXIT_FAILURE))
-/***********************  TCP part  *************************************************/
-int make_socket(void){
-	int sock;
-	sock = socket(PF_INET,SOCK_STREAM,0);
-	if(sock < 0) ERR("socket");
-	return sock;
-}
-
-struct sockaddr_in make_address(char *address, uint16_t port){
-	struct sockaddr_in addr;
-	struct hostent *hostinfo;
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons (port);
-	hostinfo = gethostbyname(address);
-	if(hostinfo == NULL)HERR("gethostbyname");
-	addr.sin_addr = *(struct in_addr*) hostinfo->h_addr;
-	return addr;
-}
-
-int connect_socket(char *name, uint16_t port){
-	struct sockaddr_in addr;
-	int socketfd;
-	socketfd = make_socket();
-	addr=make_address(name,port);
-	if(connect(socketfd,(struct sockaddr*) &addr,sizeof(struct sockaddr_in)) < 0){
-		if(errno!=EINTR) ERR("connect");
-		else { 
-			fd_set wfds ;
-			int status;
-			socklen_t size = sizeof(int);
-			FD_ZERO(&wfds);
-			FD_SET(socketfd, &wfds);
-			if(TEMP_FAILURE_RETRY(select(socketfd+1,NULL,&wfds,NULL,NULL))<0) ERR("select");
-			if(getsockopt(socketfd,SOL_SOCKET,SO_ERROR,&status,&size)<0) ERR("getsockopt");
-			if(0!=status) ERR("connect");
-		}
-	}
-	return socketfd;
-}
-
-/**********************************************************************************/
-
 
 int main(void) {
     char decission[50];
@@ -109,10 +64,10 @@ int main(void) {
 
         if ((t = tcp_socket_read_packet(s, rec)) == 0 && g_doWork==1) {
             perror("Server closed connection client\n");
-            return t;
+            break;
         } else if (t < 0) {
             perror("recv");
-            return t;
+            break;
         }
         switch (rec->msg) {
             case NO_PLAYER:
@@ -147,27 +102,30 @@ int main(void) {
                 }
                 if(isAnyTileAvaliable == 1) {
                     points = 0;
-                    gather_input(&c, &x, &y, &points, rec->tiles, rec->currentBoard);
-                    /* Print updated points */
-                    scrabble_game_print_title();
-                    if (rec->playerType == FIRST) rec->p1Points += points;
-                    if (rec->playerType == SECOND) rec->p2Points += points;
-                    scrabble_game_print_points(rec->p1Points, rec->p2Points, rec->playerType);
+                    if(-1 == gather_input(&c, &x, &y, &points, rec->tiles, rec->currentBoard)) {
+                        printf("gater input error\n");
+                    }else {
+                        /* Print updated points */
+                        scrabble_game_print_title();
+                        if (rec->playerType == FIRST) rec->p1Points += points;
+                        if (rec->playerType == SECOND) rec->p2Points += points;
+                        scrabble_game_print_points(rec->p1Points, rec->p2Points, rec->playerType);
 
-                    /* Print updated board */
-                    rec->currentBoard[x][y] = c;
-                    scrabble_game_print_board(rec->currentBoard);
+                        /* Print updated board */
+                        rec->currentBoard[x][y] = c;
+                        scrabble_game_print_board(rec->currentBoard);
 
-                    /* Send data to server. */
-                    tmp->msg = MOVE_DATA;
-                    tmp->letter = c;
-                    tmp->x_coord = x;
-                    tmp->y_coord = y;
-                    tmp->p1Points = rec->p1Points;
-                    tmp->p2Points = rec->p2Points;
-                    printf("Right before sending packet: %d \n",tmp->isMatchOngoing);
-                    tcp_socket_send_packet(s, tmp);
-                    scrabble_game_print_wait_for_move();
+                        /* Send data to server. */
+                        tmp->msg = MOVE_DATA;
+                        tmp->letter = c;
+                        tmp->x_coord = x;
+                        tmp->y_coord = y;
+                        tmp->p1Points = rec->p1Points;
+                        tmp->p2Points = rec->p2Points;
+                        printf("Right before sending packet: %d \n", tmp->isMatchOngoing);
+                        tcp_socket_send_packet(s, tmp);
+                        scrabble_game_print_wait_for_move();
+                    }
                 }
                 else{
                     printf("##########################################\n");
@@ -228,15 +186,24 @@ int main(void) {
     return 0;
 }
 
-void gather_input(char* c, int* x, int* y, int* points, char tiles[5], char board[5][5])
+int gather_input(char* c, int* x, int* y, int* points, char tiles[5], char board[5][5])
 {
 	int i, k, j;
 	
 	printf("Supply <letter> <y> <x>\n");
 	while(1)
 	{
-		scanf(" %c %d %d", c, x, y);
-		
+		if( 0>scanf(" %c %d %d", c, x, y) ){
+            if(errno == EINTR){
+                printf("Input error eintr\n");
+                return -1;
+            }
+            else{
+               printf("Input error\n");
+            }
+        }
+
+
 		/* Basic border check */
 		if(*x < 0 || *y < 0 || *x > 4 || *y > 4)
 		{
@@ -292,12 +259,14 @@ void gather_input(char* c, int* x, int* y, int* points, char tiles[5], char boar
 			printf("Please... movement is not allowed.\n");
 			continue;
 		}
-		
-		
+
+
 		/* At this point everything (for sure) is ok. */
 		break;
 	}
 	*points = scrabble_game_calculate_points(board, *x, *y);
+
+    return 1;
 }
 
 void sigint_handler(int sig) {

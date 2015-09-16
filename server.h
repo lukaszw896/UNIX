@@ -64,7 +64,7 @@ void sigchld_handler(int);
 /*
  * Function which is a response to MOVE_DATA client message
  */
-void respond_to_move_data(int clientDescriptor, packet* msg, char* tmpGameData,char* gameData, int playerType,FILE* fd,game* scrabbleGameAddress, char* playerTiles, PlayerInfo* waitingPlayer,int gameSemId );
+void respond_to_move_data(int clientDescriptor, packet* msg, char* tmpGameData,char* gameData, int playerType,FILE* fd,game* scrabbleGameAddress, char* playerTiles, char* fileName,int gameSemId );
 /*
  * Function which is a response to PLAY_ANOTHER_GAME client message
  */

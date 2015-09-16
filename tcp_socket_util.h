@@ -29,6 +29,12 @@ typedef struct
 	char tiles[5];
 } packet;
 
+int make_socket(void);
+
+struct sockaddr_in make_address(char *address, uint16_t port);
+
+int connect_socket(char *name, uint16_t port);
+
 /*
  * Creates basic socket of AF_UNIX family. 
  * Socket is indetified with its descriptor and special structure.
